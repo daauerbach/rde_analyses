@@ -1,0 +1,296 @@
+---
+title: "RDE & RS-FRIS HTMAX"
+author: "dan.auerbach@dfw.wa.gov"
+date: "`r Sys.Date()`"
+format:
+  html:
+    embed-resources: true
+    theme: yeti 
+    code-fold: true
+    toc: true
+    toc-location: left
+    grid:
+      sidebar-width: 180px
+      body-width: 1100px
+      margin-width: 20px
+---
+
+WRIA 1: Nooksack
+WRIA 20: Soleduc
+WRIA 26: Cowlitz
+WRIA 32: Walla Walla
+WRIA 39: Upper Yakima
+WRIA 48: Methow 
+WRIA 59: Colville
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, fig.width = 9, fig.height = 10)
+
+library("tidyverse", quietly = T)
+library("sf")
+library("patchwork")
+library("gt")
+theme_set(theme_minimal()) 
+
+dir_data_common <- "~/T/DFW-Team WDFW Watershed Synthesis - data_common"
+epsg <- 2927 #WA state standard; NAD83(HARN)/ft
+
+
+```
+
+```{r fris_htmax}
+#https://www.arcgis.com/sharing/rest/content/items/cfdfaab44b9b49adb2740e84ed722b68/info/metadata/metadata.xml?format=default&output=html
+#https://gis-dev.dnr.wa.gov/site2/rest/services/Public_Forest_Mgmt/WADNR_PUBLIC_RS_FRIS_Rasters/MapServer
+#in 2927, 66x66ft, range 0:300, note substantial areas of missing and NA in htmax
+fris_htmax <- terra::rast(file.path(dir_data_common, "rs_fris_HTMAX/RS_FRIS_HTMAX.tif"))
+```
+
+```{r sf_wrias, eval=FALSE}
+sf_wrias <- sf::read_sf(file.path(dir_data_common, "WR_WAT_WRIA.gdb/")) |>
+  mutate(wria = paste0(str_pad(WRIA_NR,width = 2, pad = "0",),"_",WRIA_NM) |> factor()) |>
+  select(WRIA_NR, WRIA_NM, wria, acres = WRIA_AREA_ACR_QT) |> arrange(wria) |> 
+  sf::st_transform(sf::st_crs(epsg))
+```
+
+```{r sf_wa_cnty}
+sf_wa_cnty <- sf::read_sf(file.path(dir_data_common, "WA_County_Boundaries/WA_County_Boundaries.shp")) |> 
+  select(name = JURISDIC_2, name_county = JURISDIC_3) |> 
+  sf::st_transform(sf::st_crs(epsg))
+```
+
+iterate over wrias...
+
+```{r}
+wrias <- as_tibble(sf_wrias) |> 
+  filter(WRIA_NR %in% c(1, 20, 26, 32, 39, 48, 59)) |>
+  #mutate(w = paste0(WRIA_NR,"_",WRIA_NM)) |> 
+  mutate(w = set_names(WRIA_NR, WRIA_NM)) |> pull(w) 
+
+wria_cntys <- map(
+  wrias,
+  ~sf_wa_cnty[filter(sf_wrias, WRIA_NR == .x),] |> 
+    as_tibble() |> arrange(name) |> select(-geometry) |> 
+    mutate(wria_nr = .x)
+)
+
+
+# read RDE polys
+# then add SPTH200 values from public site index soil+tree polys
+# then add max HTMAX value
+
+#st_layers(file.path(dir_data_common, "SPTH_Tessellation.gdb"))
+
+#union multipolygons per PID
+#dropping EOW for speed and no trees
+#also dropping very small polys less than ~1 cell in 66ft x 66ft fris_htmax
+read_union_tess <- function(n){
+    st_read(file.path(dir_data_common, "SPTH_Tessellation.gdb"),
+           layer = paste0("wria",str_pad(n, width = 2, pad = "0"),"_SPTH_Tessellation")
+           ) |> 
+    filter(
+      Zone == "RMZ", 
+      Shape_Area > 4500
+      ) |> 
+    st_zm() |>
+    group_by(pid = permanent_identifier, zone = Zone) |> 
+    summarise(area = sum(Shape_Area), .groups = "drop")
+}
+
+#SPTH polys from https://fortress.wa.gov/dfw/public/PublicDownload/Habitat/PHSRMZInformation/index.htm
+
+#to stay more memory stable...
+for(wria_nr in wrias[2]){
+  tess <- read_union_tess(wria_nr)
+  spth <- map(
+    wria_cntys[[which(wrias==wria_nr)]]$name,
+    ~read_sf(file.path(dir_data_common, paste0("spth_public/",.x,".gdb")), layer = paste0(.x, "200YearSiteIndex_sv")) |> 
+      select(CountyName, TreeName, SiteIndex200Year)
+  ) |> 
+    bind_rows() |> 
+    st_zm() |> 
+    st_transform(crs = st_crs(epsg))
+ 
+  tess_spth <- st_join(
+    tess
+    ,
+    spth[st_as_sfc(st_bbox(tess)),] |> 
+      #mapview::mapview(zcol = "SiteIndex200Year")
+      select(tree = TreeName, si200 = SiteIndex200Year)
+    ,
+    largest = TRUE
+  ) |> 
+    mutate(
+      si200 = replace_na(si200, 100),
+      htmax_max = exactextractr::exact_extract(fris_htmax, Shape, "max"),
+      d_si200_htmax = si200 - htmax_max
+    ) |> 
+    select(
+      pid,
+      tree, si200, #SPTH200 polys
+      contains("htmax")
+    )
+  
+  saveRDS(tess_spth, paste0("~/T/DFW-Team WDFW Watershed Synthesis - General/riparian/rde_htmax_wria",str_pad(wria_nr, width = 2, pad = "0"),".rds"))
+}
+
+
+as_tibble(tess_spth) |>
+  drop_na(d_si200_htmax) |> 
+  ggplot() +
+  geom_col(aes(fct_reorder(pid, d_si200_htmax, max), d_si200_htmax, fill = d_si200_htmax > 0, color = d_si200_htmax > 0), show.legend = F) +
+  scale_x_discrete(labels = NULL) +
+  scale_fill_manual(values = c("darkgreen", "orange"), aesthetics = c("color","fill")) +
+  facet_wrap(~tree, ncol = 1) +
+  labs(
+    x = "RDE tessellation reaches", y = "SPTH200 - 'max HTMAX val'",
+    subtitle = "Positive (orange) where SPTH200 > 'max HTMAX val' (existing trees shorter than site index) \nNegative (green) where SPTH200 < 'max HTMAX val' (existing trees taller than site index)"
+    )
+
+
+as_tibble(tess_spth) |>
+  drop_na(d_si200_htmax) |> 
+  count(tree, htmax_larger = d_si200_htmax < 0) |> 
+  mutate(htmax_larger = if_else(htmax_larger,"htmax_larger","si200_larger")) |> 
+  pivot_wider(names_from = htmax_larger, values_from = n) |> 
+  mutate(
+    pct = htmax_larger / (htmax_larger + si200_larger)
+  )
+  
+
+as_tibble(tess_spth) |>
+  select(-Shape) |> 
+  drop_na(d_si200_htmax) |> 
+  pivot_longer(cols = c(si200, htmax_max)) |> 
+  ggplot() +
+  ggridges::geom_density_ridges(aes(value, tree, color = name, fill = name), alpha = 0.5, scale = 1)
+
+
+
+```
+
+
+```{r ORIG_sf_tess_11_pid, eval=FALSE}
+# read RDE polys and inner join to manually DL'd reach-table for an arbitrary PID on Lower Nisqually
+# then add SPTH200 values from public site index soil+tree polys
+# then add max HTMAX value
+
+#st_layers(file.path(dir_data_common, "rde/SourceData.gdb"))
+
+st_layers(file.path(dir_data_common, "SPTH_Tessellation.gdb"))
+
+pid <- "166130009" #https://riparis.esa-prod.sitkatech.com/reaches/166130009
+
+sf_tess_11_pid <- st_read(file.path(dir_data_common, "SPTH_Tessellation.gdb"), layer = "wria11_SPTH_Tessellation") |> 
+  st_zm() |>
+  #union multipolygons per PID
+  #dropping EOW for speed and no trees
+  filter(Zone == "RMZ") |> 
+  group_by(pid = permanent_identifier, zone = Zone) |> 
+  summarise(area = sum(Shape_Area), .groups = "drop") |> 
+  inner_join(
+    list.files(path = file.path(dir_data_common, "rde"), pattern = pid, full.names = T) |> 
+      read_csv(skip = 1) |> 
+      janitor::clean_names() |>
+      rename_with(.fn = ~str_replace(.,"percent","pct"), starts_with("percent")) |>
+      rename_with(.fn = ~str_remove(.,"pattern_"), contains("pattern"))
+    ,
+    by = "pid"
+  )
+
+# as_tibble(sf_tess_11_pid) |> count(pid) |> arrange(desc(n))
+# sf_tess_11_pid |> filter(pid == "166129369") |> ggplot() + geom_sf()
+
+#has average_canopy_height but not the SPTH200 value
+glimpse(sf_tess_11_pid)
+
+# ggplot() +
+#   #geom_sf(data = sf_spth, fill = NA) + #st_convex_hull()
+#   #geom_sf(data = sf_tess_11_pid |> filter(acres > 50), fill = "blue", color = "blue")
+#   geom_sf(data = st_as_sfc(st_bbox(sf_spth)), fill = "brown") +
+#   geom_sf(data = st_as_sfc(st_bbox(sf_tess_11_pid)), color = "blue", fill = NA)
+
+#add SPTH values and coerce on 100ft default min
+sf_tess_11_pid <- st_join(
+  sf_tess_11_pid
+  ,
+  sf_spth[st_as_sfc(st_bbox(sf_tess_11_pid)),] |> 
+    select(tree = TreeName, si200 = SiteIndex200Year)
+  ,
+  largest = TRUE
+) |> 
+  mutate(si200 = replace_na(si200, 100))
+
+#add HTMAX max cell val per pid poly
+sf_tess_11_pid <- sf_tess_11_pid |> 
+  mutate(
+    htmax_max = exactextractr::exact_extract(fris_htmax, Shape, "max"),
+    htmax_mean = exactextractr::exact_extract(fris_htmax, Shape, "mean")
+  )
+
+```
+
+```{r ORIG_figures}
+# 3 values, separable questions
+#  - average_canopy_height within tess polygon
+#  - SPTH200 from soils + default (used to define tess polygon)
+#  - HTMAX
+
+d <- as_tibble(sf_tess_11_pid) |>
+  drop_na(average_canopy_height) |> 
+  select(
+    pid,
+    average_canopy_height, #RDE
+    tree, si200, #SPTH200 polys
+    starts_with("htmax")
+    ) |> 
+  mutate(
+    d_spth_avg_canopy = si200 - average_canopy_height,
+    d_spth_htmax_mean = si200 - htmax_mean,
+    d_spth_htmax_max = si200 - htmax_max
+  )
+
+# pivot_longer(
+#   -c(pid, tree),
+#   names_to = "measure",
+#   values_to = "val"
+# ) |> 
+
+d |> 
+  ggplot() +
+  #geom_point(aes(fct_reorder(pid, d_spth_avg_canopy, max), d_spth_avg_canopy, color = d_spth_avg_canopy > 0), show.legend = F) +
+  geom_col(aes(fct_reorder(pid, d_spth_avg_canopy, max), d_spth_avg_canopy, fill = d_spth_avg_canopy > 0, color = d_spth_avg_canopy > 0), show.legend = F) +
+  scale_x_discrete(labels = NULL) +
+  scale_fill_manual(values = c("darkgreen", "orange"), aesthetics = c("color","fill")) +
+  facet_wrap(~tree, ncol = 1) +
+  labs(
+    x = "RDE tessellation reaches", y = "SPTH200 - 'average_canopy_height'",
+    subtitle = "Positive (orange) where SPTH200 > 'average_canopy_height' (existing trees shorter than site index) \nNegative (green) where SPTH200 < 'average_canopy_height' (existing trees taller than site index)"
+    )
+
+ggsave("~/T/DFW-Team WDFW Watershed Synthesis - General/riparian/rde_htmax_figs/f_d_spth_avg_canopy.png", height = 9, width = 7, units = "in")
+
+d |> 
+  drop_na(d_spth_htmax_max) |> 
+  ggplot() +
+  geom_col(aes(fct_reorder(pid, d_spth_htmax_max, max), d_spth_htmax_max, fill = d_spth_htmax_max > 0, color = d_spth_htmax_max > 0), show.legend = F) +
+  scale_x_discrete(labels = NULL) +
+  scale_fill_manual(values = c("darkgreen", "orange"), aesthetics = c("color","fill")) +
+  facet_wrap(~tree, ncol = 1) +
+  labs(
+    x = "RDE tessellation reaches", y = "SPTH200 - 'max HTMAX val'",
+    subtitle = "Positive (orange) where SPTH200 > 'max HTMAX val' (existing trees shorter than site index) \nNegative (green) where SPTH200 < 'max HTMAX val' (existing trees taller than site index)"
+    )
+
+ggsave("~/T/DFW-Team WDFW Watershed Synthesis - General/riparian/rde_htmax_figs/f_d_spth_htmax_max.png", height = 9, width = 7, units = "in")
+
+
+d |> 
+  drop_na(d_spth_htmax_max) |> 
+  filter(d_spth_htmax_max < 0) |> 
+  count(tree) |> arrange(desc(n))
+
+3104 / 14833
+
+```
+
