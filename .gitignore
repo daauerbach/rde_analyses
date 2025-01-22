@@ -6,6 +6,9 @@
 .RData
 .RDataTmp
 
+#saved single objects
+*.rds
+
 # User-specific files
 .Ruserdata
 
