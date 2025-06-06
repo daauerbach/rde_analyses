@@ -508,3 +508,84 @@ for (f in list.files("figures", full.names = T)){
 cat(':::')
 ```
 
+
+```{r quick_check_talls, eval=FALSE}
+
+tess_spth_200 <- map(
+  list.files("~/T/DFW-Team WDFW Watershed Synthesis - General/riparian/rde_htmax/", pattern = ".rds", full.names = T)
+  ,
+  ~readRDS(.x) |>
+    filter(htmax_max > 200) |> 
+    mutate(
+      larger = if_else(d_si200_htmax < 0, "htmax_larger", "si200_larger"),
+      acres = st_area(Shape) |> units::set_units("acres"),
+      sqkm = acres |> units::set_units("km^2") #* ~0.004
+      ) |> 
+    cbind(
+      as_tibble(sf_wrias) |> 
+        filter(WRIA_NR == as.integer(str_sub(tools::file_path_sans_ext(.x),-2,-1))) |> 
+        select(WRIA_NR, WRIA_NM, wria)
+    )
+) |> 
+  bind_rows()
+
+tess_spth_200 |> 
+  #slice_sample(n = 1000) |> 
+  filter(WRIA_NR == 15) |> 
+  filter(htmax_max > 250) |> mapview::mapview()
+  ggplot() + geom_sf(aes(fill = htmax_max, color = htmax_max)) +
+  wacolors::scale_color_wa_c("forest_fire", aesthetics = c("color","fill"))
+
+
+```
+
+```{r eval=FALSE}
+#post-call 1/28/25
+#KF request to see 
+
+#biggish, preserving geometry
+sf_tess_spth <- map(
+  list.files("~/T/DFW-Team WDFW Watershed Synthesis - General/riparian/rde_htmax/", pattern = ".rds", full.names = T)
+  ,
+  ~readRDS(.x) |>
+    mutate(
+      larger = if_else(d_si200_htmax < 0, "htmax_larger", "si200_larger"),
+      acres = st_area(Shape) |> units::set_units("acres"),
+      sqkm = acres |> units::set_units("km^2") #* ~0.004
+      ) |> 
+    cbind(
+      as_tibble(sf_wrias) |> 
+        filter(WRIA_NR == as.integer(str_sub(tools::file_path_sans_ext(.x),-2,-1))) |> 
+        select(WRIA_NR, WRIA_NM, wria)
+    )
+) |> 
+  bind_rows()
+
+
+#tess_spth |> 
+sf_tess_spth |> 
+  filter(larger == "htmax_larger") |> 
+  mutate(
+    d_htmax = abs(d_si200_htmax),
+    d_pct = d_htmax/si200 #(htmax_max / si200) - 1
+  ) |> 
+  st_centroid() |> 
+  #filter(WRIA_NR == 1) |> ggplot() + geom_sf(aes(color = d_htmax), shape = 20, alpha = 0.6) + wacolors::scale_color_wa_c("forest_fire")
+  split(~wria, drop = T) |> 
+  walk(
+    \(df){
+      g <- ggplot(df) +
+        geom_sf(aes(color = d_htmax), shape = 20, alpha = 0.6) + 
+        wacolors::scale_color_wa_c("forest_fire", reverse = T) +
+        labs(subtitle = paste(df$wria[1], "differences, HTMAX > SiteIndex200")) +
+        theme(axis.text = element_blank())
+      ggsave(
+        filename = paste0("~/T/DFW-Team WDFW Watershed Synthesis - General/riparian/rde_htmax/figures/f_htmax_larger_",df$wria[1],".png"),
+        plot = g, width = 8, height = 8, units = "in", bg = "white", dpi = 150
+      )
+    })
+
+
+
+```
+
