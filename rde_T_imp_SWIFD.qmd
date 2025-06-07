@@ -1,0 +1,537 @@
+---
+title: "Riparian Data Engine: stream temperature impairment & salmon distribution"
+author: "dan.auerbach@dfw.wa.gov"
+date: "`r Sys.Date()`"
+format:
+  html:
+    embed-resources: true
+    theme: yeti 
+    code-fold: true
+    toc: true
+    toc-location: left
+    grid:
+      sidebar-width: 180px
+      body-width: 1100px
+      margin-width: 20px
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, fig.width = 8, fig.height = 8)
+
+library("tidyverse", quietly = T)
+library("sf")
+library("patchwork")
+library("gt")
+theme_set(theme_minimal()) 
+
+dir_data_common <- "~/T/DFW-Team WDFW Watershed Synthesis - data_common"
+epsg <- 2927 #WA state standard; NAD83(HARN)/ft
+
+```
+
+The [Riparian Data Engine (RDE)](https://ripariandata.wdfw.wa.gov/), developed by WDFW with support from ESA, is a geospatial web application that "unites WDFW riparian datasets in Washington State...allow[ing] planners to evaluate the conditions of riparian ecosystems and make data-informed planning decisions".
+
+Following publication of the Volume 1 Science Synthesis [(Quinn et al. 2020)](https://wdfw.wa.gov/publications/01987) and Volume 2 Management Recommendations [(Rentz et al. 2020)](https://wdfw.wa.gov/publications/01988), the agency has developed several technical tools to support implementation (see https://wdfw.wa.gov/species-habitats/ecosystems/riparian).
+
+The RDE enables interactive exploration of various landscape attributes associated with riparian management zone (RMZ) polygons that were consistently generated according to the [Site Potential Tree Height standard](https://wdfw.wa.gov/publications/02564) using publicly available GIS data.
+
+This analysis illustrates an application of these data to a primary motivating question: *How does riparian tree canopy within portions of the riverscape occupied by salmon relate to stream temperature assessments recorded in the [303(d) list](https://ecology.wa.gov/water-shorelines/water-quality/water-improvement/assessment-of-state-waters-303d) under Clean Water Act (CWA) Water Quality Standards (WQS)?*
+
+Interactive users of the RDE can examine a "reach table" consisting of columns of various land cover, jurisdictional, and hydrographic attributes for rows corresponding to individual RMZ units in the polygon tessellation with which attribute values were calculated. Various filters and map-based exploration allow formulation of queries that subset these rows and enable comparison of summarized attribute values. For example, a filter for tree canopy cover greater than 50% can be used to examine the number and location of such RMZs within a Water Resource Inventory Area (WRIA) or a county. In addition, a powerful feature provided by the RDE is the display of a single reach relative to its upstream and downstream network "neighborhoods" and the attributes of those areas. This "local view" is well suited to understanding how conditions in a particular location compare to adjacent portions of the riverscape with hydrologic, geomorphic and ecological connections. Such information can help to inform a range of conservation management decisions at the site scale.
+
+This analysis broadens to a regional scale, quantifying patterns per-WRIA, based on the full set of complete-WRIA reach tables, accessed via an API.
+
+# Data
+
+```{r build_rde_wria_library, include=FALSE, eval=FALSE}
+# created 4/23/25 after API first exposed
+# see rde_wrias_init.qmd for scraping calls, not yet rerun to check any issues from baseurl changes
+
+# https://api-riparis.esa-prod.sitkatech.com/docs/index.html 
+# Reaches for a County: https://api-riparis.esa-prod.sitkatech.com/counties/{countyName}/reaches/csv
+# Reaches for a WRIA: https://api-riparis.esa-prod.sitkatech.com/wrias/{wriaID}/reaches/csv
+# Reach table contents for a Reach: https://api-riparis.esa-prod.sitkatech.com/reaches/{permanentIdentifier}/ csv
+
+# rch_tbl <- map_df(1:62, ~readr::read_csv(
+#   file.path(dir_data_common, paste0("rde/wrias/rde_wria_",stringr::str_pad(.x, 2, pad = "0"), ".csv"))
+# ) |> 
+#   mutate(pid = as.character(PermanentIdentifier), PermanentIdentifier = NULL)
+# ) |> 
+#   rename(wria = WaterResourceInventoryAreaID) |> 
+#   rename_with(~str_replace(.,"Acres","_ac")) |> 
+#   janitor::clean_names() |> 
+#   select(pid, everything(), -reach_id)
+# 
+# saveRDS(rch_tbl, "~/T/DFW-Team WDFW Watershed Synthesis - data_common/rde/wria_rch_tlb.rds")
+```
+
+A complete set of reach tables includes values for >1mil rows statewide, indexed by `pid` (permanent identifiers). In this structure, a `pid`-row can include a combination of "extent of observed water" (EOW), "floodplain" (primarily based on FEMA mapping), and riparian management zone (RMZ, both banks where double-banked) geometry. However, the results presented here are based on the area (acreage) associated with the RMZ and EOW "riparian corridor".
+
+```{r rde}
+rde <- readRDS("~/T/DFW-Team WDFW Watershed Synthesis - data_common/rde/wria_rch_tlb.rds") |> 
+  mutate(
+    wria = factor(wria)
+    ,
+    swifd_any = !is.na(swifd_salmon_distribution),
+    swifd_n = 1 + str_count(swifd_salmon_distribution,","),
+    swifd_n_fct = case_when(
+      is.na(swifd_n) ~ "none",
+      swifd_n < 3 ~ "1-2 species",
+      swifd_n >= 3 ~ "3 or more species"
+    )
+    ,
+    # #1:meets WQS, 2:some concerns about some uses, 3:insuf data, 4:impair-no-TMDL, 5:TMDL
+    ## NOTE - the status "Not Impaired" in this version of the csvs is not accurate
+    ## as of 6/6/25 ver 0.0.1 the production reach table is (more accurately) "Not Assessed"
+    ## this may have been corrected in prod API but need to check with Ray
+    ## here manually overwriting
+    t_imp = temperature_impairments |> str_replace("Impaired", "Assessed") |> factor()
+    , 
+    tree_pct = all_tree_cover_ac / all_land_cover_ac,
+    veg_pct = all_vegetated_ac / all_land_cover_ac
+  )
+
+# #corresponds to nrow of reach table in ver 0.0.1 with EOW and Floodplain in Zone filter unchecked
+# rde |> filter(wria==1, rmz_ac!=0)
+# #but is NOT the same as 
+# rde |> filter(wria==1, eow_ac==0, flood_ac==0)
+# #which are PIDs with _only_ RMZ
+# #no way in this table structure, without a 'zone' attribute', to differentiate RMZ-EOW-Floodplain...
+
+```
+
+Individual tessellation units can span different assessed stream temperature status, resulting in some `pid` with multiple categories. The number and extent of these are both small, but those that involve conflicts are excluded ("1, 5"), while combinations that include "category 3" (insufficient data) are re-coded as 3 and those that include impairment are aggregated.
+
+```{r rde_t_imp_f}
+rde <- rde |>
+  filter(t_imp != "1, 5") |> 
+  mutate(
+    t_imp_f = case_when(
+      t_imp == "1, 5" ~ NA_character_,
+      str_detect(t_imp, "3") ~ "3",
+      str_detect(t_imp, "4|5") ~ "4|5", #bundles 2-4, 2-5, 4-5, 4A, 4B, 5
+      str_detect(t_imp, "Not") ~ NA_character_,
+      .default = t_imp
+    )
+  )
+```
+
+```{r gt_rde_t_imp_f}
+rde |>
+  summarise(
+    pid_n = n(),
+    across(c(riparian_ac, rmz_ac, eow_ac), list(sum = ~sum(., na.rm = T))),
+    .by = c(t_imp_f, t_imp)
+  ) |> 
+  mutate(pid_pct = round(pid_n / sum(pid_n), 3)) |> 
+  arrange(t_imp_f) |> 
+  select(`analysis category` = t_imp_f, `303d category` = t_imp, starts_with("pid"), ends_with("sum")) |> 
+  gt() |> 
+  fmt_percent(pid_pct, decimals = 1) |> 
+  fmt_number(ends_with("sum"), decimals = 0)
+
+```
+
+The Statewide Integrated Fish Distribution (SWIFD) data characterize the documented and presumed presence of several salmonid species. For an initial examination, the `pid` units can be stratified according to whether Chinook are included in the set of species present in SWIFD for the location.
+
+```{r rde_swifd_chin}
+rde <- rde |>
+  mutate(
+    swifd_chin = case_when(
+      str_detect(swifd_salmon_distribution, "Chin") ~ "salmon_incl_chin",
+      str_detect(swifd_salmon_distribution, "Chin", negate = T) ~ "salmon_not_chin",
+      is.na(swifd_salmon_distribution) ~ "not salmon"
+    )
+  )
+```
+
+```{r gt_rde_swifd_chin}
+rde |> 
+  summarise(
+    pid_n = n(),
+    across(c(riparian_ac, rmz_ac, eow_ac), list(sum = ~sum(., na.rm = T))),
+    .by = c(swifd_chin)
+  ) |> 
+  mutate(pid_pct = round(pid_n / sum(pid_n), 3)) |> 
+  arrange(swifd_chin) |> 
+  select(swifd_chin, starts_with("pid"), ends_with("sum")) |> 
+  gt() |> 
+  fmt_percent(pid_pct, decimals = 1) |> 
+  fmt_number(ends_with("sum"), decimals = 0)
+```
+
+The acreage and average tree canopy cover within the RMZ corridor can be summarized according to these strata.
+
+```{r rde_st}
+rde_st <- rde |> 
+  summarise(
+    across(c(riparian_ac, rmz_ac), list(sum = ~sum(., na.rm = T))),
+    across(
+      tree_pct, #ends_with("_pct"),
+      list(
+        mean = ~mean(., na.rm = T),
+        sd = ~sd(., na.rm = T)
+        )
+      )
+    ,
+    .by = c(wria, swifd_chin, t_imp_f)
+  ) |> 
+  ##sort 'grand percents' across wrias, not interesting?
+  #mutate(across(ends_with("ac_sum"), list(pct = ~./sum(.)))) |> 
+  
+#  mutate(rmz_ac_pct_temp_in_swifd = rmz_ac_sum / sum(rmz_ac_sum), .by = c(wria, swifd_any)) |> 
+  
+  mutate(riparian_ac_pct_swifd_in_temp = riparian_ac_sum / sum(riparian_ac_sum), .by = c(wria, t_imp_f)) |> 
+  arrange(wria, t_imp_f, swifd_chin)
+```
+
+# Visualizations
+
+**UNFINISHED - should probably switch to 303d categories within swifd_chin levels (and functionalize plots etc.)**
+
+```{r pal_swifd_chin, include=FALSE}
+#just moving quickly
+pal_swifd_chin <- c("not salmon" = NA, "salmon_incl_chin" = "salmon", "salmon_not_chin" = "tan")
+```
+
+
+## Not assessed
+
+```{r}
+rde_st |> 
+  filter(as.integer(as.character(wria)) < 26, is.na(t_imp_f)) |> 
+  mutate(
+    riparian_ac_pct_swifd_in_temp = if_else(
+      swifd_chin == "not salmon", 
+      -1*riparian_ac_pct_swifd_in_temp, 
+      riparian_ac_pct_swifd_in_temp)
+    ) |> 
+  ggplot() + wacolors::scale_fill_wa_c("gorge", reverse = T, aesthetics = c("fill")) +
+  geom_col(aes(x = riparian_ac_pct_swifd_in_temp, 
+               y = fct_rev(wria),
+               fill = tree_pct_mean, 
+               color = swifd_chin
+               ),
+           position = position_dodge(0.8)
+           ) +
+  geom_vline(xintercept = 0, linetype = 3, linewidth = 0.5) +
+  scale_x_continuous(limits = c(-1, 1)) +
+  scale_color_manual(values = pal_swifd_chin) +
+  guides(color = guide_legend(
+    override.aes = list(fill = c("not salmon" = NA, "salmon_incl_chin" = "salmon", "salmon_not_chin" = "tan"))
+    )) +
+  labs(x = "<----- no salmon                salmon ----->", y = NULL, 
+       title = "Relative proportion of RMZ corridor by SWIFD Chinook presence for 'Not Assessed' 303d status",
+       subtitle = "Darker green indicates higher average tree cover")
+
+```
+
+## Category 3
+
+```{r}
+rde_st |> 
+  filter(as.integer(as.character(wria)) < 26, t_imp_f == "3") |> 
+  mutate(
+    riparian_ac_pct_swifd_in_temp = if_else(
+      swifd_chin == "not salmon", 
+      -1*riparian_ac_pct_swifd_in_temp, 
+      riparian_ac_pct_swifd_in_temp)
+    ) |> 
+  ggplot() + wacolors::scale_fill_wa_c("gorge", reverse = T, aesthetics = c("fill")) +
+  geom_col(aes(x = riparian_ac_pct_swifd_in_temp, 
+               y = fct_rev(wria),
+               fill = tree_pct_mean, 
+               color = swifd_chin
+               ),
+           position = position_dodge(0.8)
+           ) +
+  geom_vline(xintercept = 0, linetype = 3, linewidth = 0.5) +
+  scale_x_continuous(limits = c(-1, 1)) +
+  scale_color_manual(values = pal_swifd_chin) +
+  guides(color = guide_legend(
+    override.aes = list(fill = c("not salmon" = NA, "salmon_incl_chin" = "salmon", "salmon_not_chin" = "tan"))
+    )) +
+  labs(x = "<----- no salmon                salmon ----->", y = NULL, 
+       title = "Relative proportion of RMZ corridor by SWIFD Chinook presence for 303d 'insufficent data' stream temp",
+       subtitle = "Darker green indicates higher average tree cover")
+
+```
+
+
+## Category 1
+
+```{r}
+rde_st |> 
+  filter(as.integer(as.character(wria)) < 26, t_imp_f == "1") |> 
+  mutate(
+    riparian_ac_pct_swifd_in_temp = if_else(
+      swifd_chin == "not salmon", 
+      -1*riparian_ac_pct_swifd_in_temp, 
+      riparian_ac_pct_swifd_in_temp)
+    ) |> 
+  ggplot() + wacolors::scale_fill_wa_c("gorge", reverse = T, aesthetics = c("fill")) +
+  geom_col(aes(x = riparian_ac_pct_swifd_in_temp, 
+               y = fct_rev(wria),
+               fill = tree_pct_mean, 
+               color = swifd_chin
+               ),
+           position = position_dodge(0.8)
+           ) +
+  geom_vline(xintercept = 0, linetype = 3, linewidth = 0.5) +
+  scale_x_continuous(limits = c(-1, 1)) +
+  scale_color_manual(values = pal_swifd_chin) +
+  guides(color = guide_legend(
+    override.aes = list(fill = c("not salmon" = NA, "salmon_incl_chin" = "salmon", "salmon_not_chin" = "tan"))
+    )) +
+  labs(x = "<----- no salmon                salmon ----->", y = NULL, 
+       title = "Relative proportion of RMZ corridor by SWIFD Chinook presence for 303d 'not impaired' stream temp",
+       subtitle = "Darker green indicates higher average tree cover")
+
+```
+
+## Category 2
+
+```{r}
+rde_st |> 
+  filter(as.integer(as.character(wria)) < 26, t_imp_f == "2") |> 
+  mutate(
+    riparian_ac_pct_swifd_in_temp = if_else(
+      swifd_chin == "not salmon", 
+      -1*riparian_ac_pct_swifd_in_temp, 
+      riparian_ac_pct_swifd_in_temp)
+    ) |> 
+  ggplot() + wacolors::scale_fill_wa_c("gorge", reverse = T, aesthetics = c("fill")) +
+  geom_col(aes(x = riparian_ac_pct_swifd_in_temp, 
+               y = fct_rev(wria),
+               fill = tree_pct_mean, 
+               color = swifd_chin
+               ),
+           position = position_dodge(0.8)
+           ) +
+  geom_vline(xintercept = 0, linetype = 3, linewidth = 0.5) +
+  scale_x_continuous(limits = c(-1, 1)) +
+  scale_color_manual(values = pal_swifd_chin) +
+  guides(color = guide_legend(
+    override.aes = list(fill = c("not salmon" = NA, "salmon_incl_chin" = "salmon", "salmon_not_chin" = "tan"))
+    )) +
+  labs(x = "<----- no salmon                salmon ----->", y = NULL, 
+       title = "Relative proportion of RMZ corridor by SWIFD Chinook presence for 303d 'at risk/concerns' stream temp",
+       subtitle = "Darker green indicates higher average tree cover")
+
+```
+
+## Category 4|5
+
+Showing that the large majority of reaches/RMZs with category 4 or 5 impairment designations are also salmon-occupied reaches, with many also Chinook reaches.
+
+```{r}
+rde_st |> 
+  filter(as.integer(as.character(wria)) < 26, t_imp_f == "4|5") |> 
+  mutate(
+    riparian_ac_pct_swifd_in_temp = if_else(
+      swifd_chin == "not salmon", 
+      -1*riparian_ac_pct_swifd_in_temp, 
+      riparian_ac_pct_swifd_in_temp)
+    ) |> 
+  ggplot() + wacolors::scale_fill_wa_c("gorge", reverse = T, aesthetics = c("fill")) +
+  geom_col(aes(x = riparian_ac_pct_swifd_in_temp, 
+               y = fct_rev(wria),
+               fill = tree_pct_mean, 
+               color = swifd_chin
+               ),
+           position = position_dodge(0.8)
+           ) +
+  geom_vline(xintercept = 0, linetype = 3, linewidth = 0.5) +
+  scale_x_continuous(limits = c(-1, 1)) +
+  scale_color_manual(values = pal_swifd_chin) +
+  guides(color = guide_legend(
+    override.aes = list(fill = c("not salmon" = NA, "salmon_incl_chin" = "salmon", "salmon_not_chin" = "tan"))
+    )) +
+  labs(x = "<----- no salmon                salmon ----->", y = NULL, 
+       title = "Relative proportion of RMZ corridor by SWIFD Chinook presence for 303d impaired stream temp",
+       subtitle = "Darker green indicates higher average tree cover")
+
+```
+
+
+
+::: {.content-hidden when-format="html"}
+
+
+```{r orig, eval=FALSE}
+rde_st |>
+  filter(as.integer(as.character(wria)) < 26) |>
+  mutate(temp_swifd = paste0(temp_imp,"_", if_else(swifd_any,"salmon","none"))) |>
+  ggplot() + wacolors::scale_fill_wa_c("gorge", reverse = T, aesthetics = c("fill","color")) +
+  geom_point(aes(temp_swifd, wria, color = tree_pct_mean, size = rmz_ac_pct_swifd_in_temp)) +
+  scale_size_area(name = "% RMZ ac") +
+  labs(x = NULL, #y = NULL,
+       title = "Relative proportion of salmon occupied RMZ by temperature impairment status",
+       subtitle = "Darker green indicates higher average tree cover")
+
+rde_st |> 
+  filter(as.integer(as.character(wria)) < 26) |> 
+  mutate(
+    temp_swifd = paste0(temp_imp,"_", if_else(swifd_any,"salmon","none"))
+    ,
+    wria_temp = paste0(wria, "_", temp_imp),
+    rmz_ac_pct_swifd_in_temp = if_else(!swifd_any, -1*rmz_ac_pct_swifd_in_temp, rmz_ac_pct_swifd_in_temp)
+    ) |> 
+  ggplot() + wacolors::scale_fill_wa_c("gorge", reverse = T, aesthetics = c("fill","color")) +
+  geom_col(aes(x = rmz_ac_pct_swifd_in_temp, y = wria_temp, fill = tree_pct_mean)) +
+  geom_vline(xintercept = 0, linetype = 2, linewidth = 0.5) +
+  facet_wrap(~wria, ncol = 1, scales = "free_y") + 
+  theme(
+    strip.background = element_blank(),
+    strip.text = element_blank()
+  ) +
+  labs(x = "<----- no salmon        |        salmon ----->", y = NULL, 
+       title = "Relative proportion of salmon occupied RMZ by temperature impairment status",
+       subtitle = "Darker green indicates higher average tree cover")
+
+#need to fuss with factors and facets
+rde_st |> 
+  filter(as.integer(as.character(wria)) < 26) |> 
+  mutate(
+    temp_swifd = paste0(temp_imp,"_", if_else(swifd_any,"salmon","none"))
+    ,
+    wria_temp = paste0(wria, "_", temp_imp),
+    rmz_ac_pct_swifd_in_temp = if_else(!swifd_any, -1*rmz_ac_pct_swifd_in_temp, rmz_ac_pct_swifd_in_temp)
+    ) |> 
+  ggplot() + wacolors::scale_fill_wa_c("gorge", reverse = T, aesthetics = c("fill","color")) +
+  geom_col(aes(x = rmz_ac_pct_swifd_in_temp, y = wria_temp, fill = tree_pct_mean)) +
+  geom_vline(xintercept = 0, linetype = 2, linewidth = 0.5) +
+  facet_wrap(~wria_temp, ncol = 2, drop = T, scales = "free_y") + 
+  theme(
+    strip.background = element_blank(),
+    strip.text = element_blank()
+  ) +
+  labs(x = "<----- no salmon        |        salmon ----->", y = NULL, 
+       title = "Relative proportion of salmon occupied RMZ by temperature impairment status",
+       subtitle = "Darker green indicates higher average tree cover")
+
+```
+
+```{r sf_wrias, include=FALSE, eval=FALSE}
+sf_wrias <- sf::read_sf(file.path(dir_data_common, "WR_WAT_WRIA.gdb/")) |>
+  mutate(wria = paste0(str_pad(WRIA_NR,width = 2, pad = "0",),"_",WRIA_NM) |> factor()) |>
+  select(WRIA_NR, WRIA_NM, wria, acres = WRIA_AREA_ACR_QT) |> arrange(wria) |> 
+  sf::st_transform(sf::st_crs(epsg))
+```
+
+```{r gdb_tesselation_polygons, include=FALSE, eval=FALSE}
+#tesselation polygons
+#per-PID, can/do have EOW and both L and R bank RMZs as well as potentially other small 'parts'
+f_gdb <- "~/T/DFW-Team WDFW Watershed Synthesis - data_common/SPTH_Tessellation.gdb/"
+l <- st_layers(f_gdb)$name
+```
+
+```{r trying_for_high_level, include=FALSE, eval=FALSE}
+#abs acres of temperature impairments
+rde |> 
+  summarise(
+    across(rmz_ac, list(sum = ~sum(., na.rm = T))),
+    .by = c(wria, temp_imp)
+  ) |> 
+  ggplot(aes(rmz_ac_sum, wria, fill = temp_imp)) + 
+  geom_col(position = position_dodge(width = 1)) + 
+  scale_x_log10() + 
+  scale_fill_manual(values = c(cat123 = "grey", cat45 = "darkred")) #scale_fill_grey()
+
+#not very interesting correlation between categories
+rde |> 
+  summarise(
+    across(rmz_ac, list(sum = ~sum(., na.rm = T))),
+    .by = c(wria, temp_imp)
+  ) |> 
+  pivot_wider(names_from = temp_imp, values_from = rmz_ac_sum) |> 
+  ggplot(aes(cat123, cat45, size = cat123+cat45)) +
+  #geom_abline(intercept = 0, slope = 1, linetype = 3) +
+  geom_point() +
+  scale_size_area() +
+  scale_x_log10(
+    labels = scales::label_comma(),
+    #labels = scales::label_log()
+    ) #  guides(x = guide_axis_logticks())
+
+
+#temperature, salmon and trees all at once...
+#trying to work out best way to show...
+rde |> 
+  summarise(
+    across(rmz_ac, list(sum = ~sum(., na.rm = T))),
+    across(ends_with("_pct"), list(mean = ~mean(., na.rm = T), sd = ~sd(., na.rm = T)))
+    ,
+    .by = c(wria, temp_imp, swifd_n_fct)
+  ) |> 
+  ggplot() + wacolors::scale_fill_wa_c("gorge", reverse = T, aesthetics = c("fill","color")) +
+  # geom_col(aes(wria, rmz_ac_sum, fill = tree_pct_mean)) +
+  # facet_wrap(temp_imp ~ swifd_n_fct, scales = "free")
+  # geom_col(aes(wria, rmz_ac_sum, group = wria, fill = tree_pct_mean)) +
+  # facet_wrap(~temp_imp, scales = "free")
+  # geom_point(aes(swifd_n_fct, wria, size = rmz_ac_sum, color = tree_pct_mean)) +
+  # facet_wrap(~temp_imp, scales = "free")
+  geom_col(aes(rmz_ac_sum, paste(wria, temp_imp), fill = tree_pct_mean)) +
+  facet_wrap(~swifd_n_fct, scales = "free")
+
+
+rde |> 
+  summarise(
+    across(rmz_ac, list(sum = ~sum(., na.rm = T))),
+    across(tree_pct, list(mean = ~mean(., na.rm = T), sd = ~sd(., na.rm = T)))
+    ,
+    .by = c(wria, temp_imp, swifd_n_fct)
+  ) |> 
+  ggplot() + wacolors::scale_fill_wa_c("gorge", reverse = T, aesthetics = c("fill","color")) +
+  geom_pointrange(
+    aes(x = tree_pct_mean, xmin = min(0, tree_pct_mean - tree_pct_sd), xmax = max(1, tree_pct_mean + tree_pct_sd),
+        y = temp_imp,
+        size = rmz_ac_sum, color = tree_pct_mean
+    ), 
+    fatten = 1,
+    show.legend = F) +
+  scale_size_area(max_size = 4) +
+  #facet_wrap(~ wria + swifd_n_fct, ncol = 3, labeller = label_wrap_gen(multi_line = F), scales = "fixed")
+  facet_grid(rows = vars(wria), cols = vars(swifd_n_fct), labeller = label_wrap_gen(multi_line = F)) +
+  scale_x_continuous(labels = scales::label_percent()) +
+  theme(axis.text.y = element_text(size = 6)) +
+  labs(x = "Mean RMZ tree canopy %", y = NULL)
+
+#below the line indicates lower average tree cover for temp-impaired salmon-bearing RMZs 
+rde |> 
+  summarise(
+    across(rmz_ac, list(sum = ~sum(., na.rm = T))),
+    across(tree_pct, list(mean = ~mean(., na.rm = T), sd = ~sd(., na.rm = T)))
+    ,
+    .by = c(wria, temp_imp, swifd_n_fct)
+  ) |> 
+  filter(swifd_n_fct != "none") |> 
+  pivot_wider(names_from = temp_imp, values_from = where(is.numeric)) |> 
+  ggplot(aes(
+    tree_pct_mean_cat123, tree_pct_mean_cat45, group = wria
+    )) +
+  geom_text(aes(label = wria), size = 4, color = "grey40", nudge_x = 0.01, nudge_y = 0.01) +
+  geom_point(aes(
+                 shape = swifd_n_fct,
+                 color = tree_pct_mean_cat123 - tree_pct_mean_cat45
+                 )
+             , size = 2.5
+             #,show.legend = F
+             ) +
+  geom_abline(intercept = 0, slope = 1, linetype = 3) +
+  wacolors::scale_fill_wa_c("stuart", midpoint = 0, aesthetics = c("fill","color")) +
+  scale_size_area(max_size = 4) +
+  scale_x_continuous(labels = scales::label_percent()) +
+  scale_y_continuous(labels = scales::label_percent()) +
+  facet_wrap(~swifd_n_fct) +
+  guides(
+    shape = guide_none(),
+    color = guide_colorbar(title = expression("\u0394 tree% cat123-cat45"))
+    ) +
+  theme(legend.position = "top") +
+  labs(title = "Average RMZ tree cover for temperature impaired vs not impaired salmon-bearing reaches",
+  subtitle = "WRIAs below line indicate temp impaired reaches tend to have lower tree canopy")
+
+```
+
+:::
