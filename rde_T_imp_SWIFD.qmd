@@ -311,6 +311,8 @@ gg_pct_meeting_wria("not_salmon") +
   gg_pct_meeting_wria("salmon_with_chin")
 ```
 
+Differentiating by WRIA west of the Cascade crest while remaining focused on reaches with assessed 303(d) status within SWIFD classes (defined by presence of Chinook or other species), the large disparity between those meeting standards (category 1, green) and those with concerns or designated impairment (2, orange and 4|5 brown) is broadly evident. Some of these differences are likely due to biases in the locations assessed (i.e., the 303(d) categories do not come from a random sample design), but the pattern of substantially fewer reaches meeting standards is consistent across the varied physiography and land uses of these WRIAs. Note that percentages sum to 1 within per-WRIA panels of each column, but "not assessed" (not shown) make up large portions of many WRIA-SWIFD types.
+
 ```{r gg_col_pct_meeting_all_swifd_chin, fig.width=9, fig.height=10}
 rde_smry_wria |> 
   filter(
@@ -324,15 +326,130 @@ rde_smry_wria |>
   scale_x_continuous(labels = scales::label_percent()) +
   scale_fill_manual(name = "303(d)", values = pal_t_imp_f) +
   facet_grid(rows = vars(wria), cols = vars(swifd_chin), scales = "fixed") +
-  labs(x = "Proportion of total RMZ area\n reaches with assessed 303d category", y = NULL) +
+  labs(x = "Proportion of total RMZ area\n 303(d) assessed reaches per SWIFD class", y = NULL) +
   theme(
     legend.position = "top"
   )
 ```
 
+The relationship of assessed water temperature to riparian tree cover percentage appears more complex. The plot below illustrates that impaired or "concern[ing]" conditions (categories 2,4,5) are associated with riparian reaches having lower tree cover on average in many WRIAs (i.e., orange/brown points to the left of green), but that the average percent tree cover is similar or greater in several instances. For example, the higher temperature categories in WRIA 15 (Kitsap) have lower tree cover in each SWIFD type, whereas the "not salmon" type reverses this pattern in WRIA 8 and the "with Chinook" category 1 reaches have lower average tree cover in WRIA 3 (lower Skagit). Moreover, lower or similar tree cover for category 1 reaches is present in all SWIFD types in WRIA 25. The coarse spatial scale of this analysis and the varied potential causes of elevated stream temperatures make these results unsurprising, but they underscore the need for caution and consideration of local factors when extrapolating from a robust site-scale mechanism (trees create shade) to a landscape-scale diagnosis (lack of trees impairs water temperature) or prescription (increasing riparian tree cover will decrease impairment).
+
+```{r gg_errorh_tree_pct_mean_sd, fig.width=9, fig.height=10}
+rde_smry_wria |> 
+  filter(
+    as.integer(as.character(wria)) < 26,
+    t_imp_f != "NA", t_imp_f != "3"
+  ) |> 
+  mutate(
+    lwr = tree_pct_mean - tree_pct_sd,
+    lwr = if_else(lwr<0, 0, lwr),
+    upr = tree_pct_mean + tree_pct_sd,
+    upr = if_else(upr>1, 1, upr)
+  ) |> 
+  ggplot(aes(y = t_imp_f, color = t_imp_f)) +
+  geom_errorbarh(aes(xmin = lwr, xmax = upr, group = wria), show.legend = F) +
+  geom_point(aes(tree_pct_mean), show.legend = F) +
+  scale_x_continuous(labels = scales::label_percent()) +
+  scale_color_manual(name = "303(d)", values = pal_t_imp_f) +
+  facet_grid(rows = vars(wria), cols = vars(swifd_chin), scales = "fixed") +
+  labs(x = "Mean per-reach % tree cover (+/- SD)",
+       y = "303(d) assessed category")
+```
+
+### WRIA 15 Example
+
+Closer examination of the per-reach tree cover relative to 303(d) status and salmon distribution within a single focal WRIA reinforces both the general pattern that fewer reaches and less riparian area are meeting temperature standards where salmon, particularly Chinook, are present, and the considerations that reaches with high tree cover can be impaired (brown bars further right) while those with low cover may not be (green bars further left). Indeed, recognition of this spatial complexity was a factor motivating the development of the RDE. 
+
+```{r gg_col_tree_pct_wria15ex, fig.width=9, fig.height=10}
+rde |> 
+  drop_na(tree_pct) |> 
+  filter(
+    wria == "15"
+    ,
+    t_imp_f != "NA",
+    t_imp_f != "3"
+    ) |> #filter(is.na(tree_pct))
+  mutate(
+    pid_f = factor(pid) |> fct_reorder(tree_pct)
+  ) |> 
+  ggplot() +
+  geom_col(aes(pid_f, tree_pct, fill = t_imp_f)) +
+  scale_x_discrete(name = "Individual reaches (by pid)", labels = NULL) +
+  scale_y_continuous(labels = scales::label_percent()) +
+  scale_fill_manual(name = "303(d)", values = pal_t_imp_f) +
+  facet_wrap(~swifd_chin, ncol = 1, scales = "free_x") +
+  theme(legend.position = "top") +
+  labs(title = "WRIA 15 Kitsap")
+
+```
+
+```{r gg_scatter_ac_tree_wria15, fig.width=9, fig.height=10}
+rde |> 
+  drop_na(tree_pct) |> 
+  filter(
+    wria == "15",
+    t_imp_f != "NA",
+    t_imp_f != "3"
+  ) |> 
+  mutate(rapt = riparian_ac * tree_pct) |> 
+  ggplot() +
+  geom_point(aes(riparian_ac, tree_pct, color = t_imp_f), size = 0.5) +
+  scale_y_continuous(labels = scales::label_percent()) +
+  scale_color_manual(name = "303(d)", values = pal_t_imp_f) +
+  facet_wrap(~swifd_chin, ncol = 1, scales = "fixed") +
+  theme(legend.position = "top") +
+  labs(title = "WRIA 15 Kitsap")
+```
+
+```{r gg_bin2d_ac_tree_wria15, fig.width=9, fig.height=10}
+rde |> 
+  drop_na(tree_pct) |> 
+  filter(
+    wria == "15",
+    t_imp_f != "NA",
+    t_imp_f != "3"
+  ) |> 
+  ggplot() +
+  geom_bin_2d(aes(riparian_ac, tree_pct, fill = t_imp_f, alpha = after_stat(count))) +
+  scale_y_continuous(labels = scales::label_percent()) +
+  scale_fill_manual(name = "303(d)", values = pal_t_imp_f) +
+  scale_alpha(range = c(0.3,1)) +
+  facet_wrap(~swifd_chin + t_imp_f, ncol = 3, scales = "fixed") +
+  theme(legend.position = "top") +
+  labs(title = "WRIA 15 Kitsap")
 
 
 
+```
+
+```{r gt_rapt}
+rde |> 
+  drop_na(tree_pct) |> 
+  filter(
+    wria == "15",
+    t_imp_f != "NA",
+    t_imp_f != "3"
+  ) |> 
+  mutate(rapt = riparian_ac * tree_pct) |>
+  summarise(
+    across(c(riparian_ac, rapt), list(sum = ~sum(., na.rm = T))),
+   .by = c(wria, swifd_chin, t_imp_f)
+  ) |> 
+  mutate(
+    rapt_sum_pct = rapt_sum / riparian_ac_sum
+  ) |> 
+  arrange(wria, swifd_chin, t_imp_f) |> 
+  gt(groupname_col = "swifd_chin", row_group_as_column = T) |> 
+  fmt_number(ends_with("_sum"), decimals = 0) |> 
+  fmt_percent(ends_with("_pct"), decimals = 0) |> 
+  cols_label(
+    t_imp_f = "303(d) category",
+    riparian_ac_sum = "\u03A3 Riparian ac.",
+    rapt_sum = "\u03A3 (Rip. ac. x tree%)",
+    rapt_sum_pct = "tree discounted % of full"
+  )
+
+```
 
 
 
