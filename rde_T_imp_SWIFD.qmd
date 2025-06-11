@@ -311,7 +311,7 @@ gg_pct_meeting_wria("not_salmon") +
   gg_pct_meeting_wria("salmon_with_chin")
 ```
 
-Differentiating by WRIA west of the Cascade crest while remaining focused on reaches with assessed 303(d) status within SWIFD classes (defined by presence of Chinook or other species), the large disparity between those meeting standards (category 1, green) and those with concerns or designated impairment (2, orange and 4|5 brown) is broadly evident. Some of these differences are likely due to biases in the locations assessed (i.e., the 303(d) categories do not come from a random sample design), but the pattern of substantially fewer reaches meeting standards is consistent across the varied physiography and land uses of these WRIAs. Note that percentages sum to 1 within per-WRIA panels of each column, but "not assessed" (not shown) make up large portions of many WRIA-SWIFD types.
+Differentiating by WRIA west of the Cascade crest while remaining focused on reaches with assessed 303(d) status within SWIFD classes (defined by presence of Chinook or other species), the large disparity between those meeting standards (category 1, green) and those with concerns or designated impairment (2, orange and 4|5 brown) is broadly evident. Some of these differences are likely due to biases in the locations assessed (i.e., the 303(d) categories do not come from a random sample design), but the pattern of substantially lower proportions of reaches meeting standards is consistent across the varied physiography and land uses of these WRIAs. Note that percentages sum to 1 within per-WRIA panels of each column, but "not assessed" (not shown) make up large portions of many WRIA-SWIFD types.
 
 ```{r gg_col_pct_meeting_all_swifd_chin, fig.width=9, fig.height=10}
 rde_smry_wria |> 
@@ -332,9 +332,9 @@ rde_smry_wria |>
   )
 ```
 
-The relationship of assessed water temperature to riparian tree cover percentage appears more complex. The plot below illustrates that impaired or "concern[ing]" conditions (categories 2,4,5) are associated with riparian reaches having lower tree cover on average in many WRIAs (i.e., orange/brown points to the left of green), but that the average percent tree cover is similar or greater in several instances. For example, the higher temperature categories in WRIA 15 (Kitsap) have lower tree cover in each SWIFD type, whereas the "not salmon" type reverses this pattern in WRIA 8 and the "with Chinook" category 1 reaches have lower average tree cover in WRIA 3 (lower Skagit). Moreover, lower or similar tree cover for category 1 reaches is present in all SWIFD types in WRIA 25. The coarse spatial scale of this analysis and the varied potential causes of elevated stream temperatures make these results unsurprising, but they underscore the need for caution and consideration of local factors when extrapolating from a robust site-scale mechanism (trees create shade) to a landscape-scale diagnosis (lack of trees impairs water temperature) or prescription (increasing riparian tree cover will decrease impairment).
+These data show a more complicated relationship between assessed water temperature category and the per-reach percentage cover of trees in the riparian corridor (RMZ+EOW). In accordance with conventional expectations, the plot below illustrates that impaired or "concern[ing]" conditions (categories 5,4,2) are associated with lower average riparian tree cover in many WRIAs (i.e., orange/brown points to the left of green). However, the average percent tree cover is similar among 303(d) categories in several instances and occasionally greater for meeting standards reaches. For example, the higher temperature categories in WRIA 15 (Kitsap) have lower tree cover in each SWIFD type (brown/orange left of green), whereas the "not salmon" type reverses this pattern in WRIA 8 and the "with Chinook" category 1 reaches have lower average tree cover in WRIA 3 (lower Skagit). Moreover, lower or similar tree cover for category 1 reaches is present in all SWIFD types in WRIA 25. Nonetheless, the generally larger areal extents of impaired categories remain apparent, shown as the scaled size of the points for per-WRIA means. The coarse spatial scale of this analysis and the varied potential causes of elevated stream temperatures make these results unsurprising, but they underscore the need for caution and consideration of local factors when extrapolating from a robust site-scale mechanism (trees create shade) to a landscape-scale diagnosis (lack of trees impairs water temperature) or prescription (increasing riparian tree cover will decrease impairment).
 
-```{r gg_errorh_tree_pct_mean_sd, fig.width=9, fig.height=10}
+```{r gg_errorh_tree_pct_mean_sd, fig.width=9, fig.height=11}
 rde_smry_wria |> 
   filter(
     as.integer(as.character(wria)) < 26,
@@ -348,12 +348,20 @@ rde_smry_wria |>
   ) |> 
   ggplot(aes(y = t_imp_f, color = t_imp_f)) +
   geom_errorbarh(aes(xmin = lwr, xmax = upr, group = wria), show.legend = F) +
-  geom_point(aes(tree_pct_mean), show.legend = F) +
+  geom_point(aes(tree_pct_mean, size = riparian_ac_sum), show.legend = F) +
+  scale_size_area(max_size = 5) +
   scale_x_continuous(labels = scales::label_percent()) +
+  coord_cartesian(clip = "off") +
   scale_color_manual(name = "303(d)", values = pal_t_imp_f) +
   facet_grid(rows = vars(wria), cols = vars(swifd_chin), scales = "fixed") +
   labs(x = "Mean per-reach % tree cover (+/- SD)",
-       y = "303(d) assessed category")
+       y = "303(d) assessed category") +
+  theme(
+    panel.grid = element_blank(),
+    panel.grid.major.x = element_line(color = "grey80", linewidth = 0.3), 
+    panel.grid.major.y = element_line(color = "grey80", linewidth = 0.3), 
+    panel.spacing.y = unit(9, "points")
+    )
 ```
 
 ### WRIA 15 Example
@@ -391,34 +399,32 @@ rde |>
     t_imp_f != "NA",
     t_imp_f != "3"
   ) |> 
-  mutate(rapt = riparian_ac * tree_pct) |> 
   ggplot() +
   geom_point(aes(riparian_ac, tree_pct, color = t_imp_f), size = 0.5) +
+  geom_vline(xintercept = 10, linetype = 3, linewidth = 0.5) +
+  geom_hline(yintercept = .75, linetype = 3, linewidth = 0.5) +
   scale_y_continuous(labels = scales::label_percent()) +
   scale_color_manual(name = "303(d)", values = pal_t_imp_f) +
-  facet_wrap(~swifd_chin, ncol = 1, scales = "fixed") +
-  theme(legend.position = "top") +
-  labs(title = "WRIA 15 Kitsap")
-```
-
-```{r gg_bin2d_ac_tree_wria15, fig.width=9, fig.height=10}
-rde |> 
-  drop_na(tree_pct) |> 
-  filter(
-    wria == "15",
-    t_imp_f != "NA",
-    t_imp_f != "3"
-  ) |> 
-  ggplot() +
-  geom_bin_2d(aes(riparian_ac, tree_pct, fill = t_imp_f, alpha = after_stat(count))) +
-  scale_y_continuous(labels = scales::label_percent()) +
-  scale_fill_manual(name = "303(d)", values = pal_t_imp_f) +
-  scale_alpha(range = c(0.3,1)) +
-  facet_wrap(~swifd_chin + t_imp_f, ncol = 3, scales = "fixed") +
+  facet_wrap(~swifd_chin + t_imp_f, ncol = 3, labeller = label_wrap_gen(multi_line = F), scales = "fixed") +
+  theme_classic() +
   theme(legend.position = "top") +
   labs(title = "WRIA 15 Kitsap")
 
-
+# rde |> 
+#   drop_na(tree_pct) |> 
+#   filter(
+#     wria == "15",
+#     t_imp_f != "NA",
+#     t_imp_f != "3"
+#   ) |> 
+#   ggplot() +
+#   geom_bin_2d(aes(riparian_ac, tree_pct, fill = t_imp_f, alpha = after_stat(count))) +
+#   scale_y_continuous(labels = scales::label_percent()) +
+#   scale_fill_manual(name = "303(d)", values = pal_t_imp_f) +
+#   scale_alpha(range = c(0.3,1)) +
+#   facet_wrap(~swifd_chin + t_imp_f, ncol = 3, scales = "fixed") +
+#   theme(legend.position = "top") +
+#   labs(title = "WRIA 15 Kitsap")
 
 ```
 
@@ -451,6 +457,108 @@ rde |>
 
 ```
 
+```{r}
+rde |> 
+  drop_na(tree_pct) |> 
+  filter(
+    #wria == "15",
+    as.integer(as.character(wria)) < 26,
+    t_imp_f != "NA",
+    t_imp_f != "3"
+  ) |> 
+  mutate(rapt = riparian_ac * tree_pct) |>
+ ggplot() +
+  #geom_point(aes(average_elevation, rapt, color = t_imp_f), size = 0.5, show.legend = F) +
+
+#  geom_point(aes(tree_pct, average_elevation, color = t_imp_f, size = riparian_ac), alpha = 0.5, show.legend = F) +
+  geom_point(aes(average_solar, average_elevation, color = t_imp_f, size = riparian_ac), alpha = 0.5, show.legend = F) +
+
+  facet_wrap(~swifd_chin + t_imp_f, ncol = 3, labeller = label_wrap_gen(multi_line = F), scales = "fixed", axes = "all") +
+  # facet_wrap(~swifd_chin, ncol = 1, labeller = label_wrap_gen(multi_line = F), scales = "fixed") +
+
+  scale_color_manual(name = "303(d)", values = pal_t_imp_f) +
+  scale_size_area(max_size = 5) +
+  # geom_vline(xintercept = 10, linetype = 3, linewidth = 0.5) +
+  # geom_hline(yintercept = .75, linetype = 3, linewidth = 0.5) +
+  # scale_y_continuous(labels = scales::label_percent()) +
+  theme_classic() +
+  theme(
+    axis.line = element_line(linewidth = 0.2),
+    strip.background = element_rect(linewidth = 0)
+    )
+
+```
+
+```{r}
+rde |> 
+  filter(
+    as.integer(as.character(wria)) < 26,
+    t_imp_f != "NA",  t_imp_f != "3"
+  ) |> 
+  select(
+    wria, swifd_chin, t_imp_f,
+    riparian_ac, rmz_ac, eow_ac,
+    starts_with("average"),
+    canopy_pattern_metric,
+    tree_pct
+    ) |> 
+  filter(swifd_chin == "salmon_with_chin") |> 
+  rename_with(~str_remove(., "average_"), starts_with("average")) |> 
+  GGally::ggpairs(
+    mapping = aes(color = t_imp_f, fill = t_imp_f, size = rmz_ac, alpha = 0.3),
+    columns = 7:12
+  ) +
+  scale_color_manual(name = "303(d)", values = pal_t_imp_f, aesthetics = c("color","fill")) +
+  scale_size_area(max_size = 5) +
+  labs(subtitle = "SWIFD: salmon_with_chin")
+
+```
+
+needs development/polish, but illustrate multiwria progressive filter sequence?
+describe as "necessary but insufficient" for standardized comparison between LEs/projects
+```{r}
+#begin with W WA
+#limit to reaches with Chinook presence per SWIFD
+#then limit to 303d temp concern --> "get ahead of a problem"
+#   could certainly also do "5"  --> "focus on the worst"
+#then focus on 
+#stream miles >= 90th 
+#tree_pct <= 10th
+#larger areas, lower tree cover
+rde |>
+  filter(
+    as.integer(as.character(wria)) < 26,
+    swifd_chin == "salmon_with_chin",
+    #t_imp_f != "NA",  t_imp_f != "3"
+    #t_imp_f %in% c("2","4|5")
+    t_imp_f == "2"
+  ) |> 
+  mutate(
+    across(
+      c(stream_miles, rmz_ac, tree_pct, average_solar),
+      list(
+        # q90 = ~. >= quantile(na.omit(.), p = 0.9),
+        # q10 = ~. <= quantile(na.omit(.), p = 0.1)
+        q75 = ~. >= quantile(na.omit(.), p = 0.75),
+        q25 = ~. <= quantile(na.omit(.), p = 0.25)
+      )
+    ),
+    .by = c(wria, swifd_chin, t_imp_f)
+  ) |> 
+  filter(
+    #stream_miles_q90 & tree_pct_q10 & average_solar_q10 
+    stream_miles_q75 & tree_pct_q25 & average_solar_q75 
+  ) |>
+  select(pid, wria, swifd_chin, t_imp_f, stream_name,
+         stream_miles, #contains("stream"), 
+         rmz_ac, #contains("rmz_ac"), 
+         tree_pct, #contains("tree_pct"), 
+         average_solar #contains("solar")
+         ) |> 
+  arrange(wria, desc(stream_miles), desc(rmz_ac), desc(tree_pct))
+  
+
+```
 
 
 ::: {.content-hidden when-format="html"}
