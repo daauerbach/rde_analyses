@@ -457,39 +457,41 @@ rde |>
 
 ```
 
-```{r}
-rde |> 
-  drop_na(tree_pct) |> 
-  filter(
-    #wria == "15",
-    as.integer(as.character(wria)) < 26,
-    t_imp_f != "NA",
-    t_imp_f != "3"
-  ) |> 
-  mutate(rapt = riparian_ac * tree_pct) |>
- ggplot() +
-  #geom_point(aes(average_elevation, rapt, color = t_imp_f), size = 0.5, show.legend = F) +
+# Multi-WRIA multi-attribute filter
 
-#  geom_point(aes(tree_pct, average_elevation, color = t_imp_f, size = riparian_ac), alpha = 0.5, show.legend = F) +
-  geom_point(aes(average_solar, average_elevation, color = t_imp_f, size = riparian_ac), alpha = 0.5, show.legend = F) +
+```{r ggpairs_solar_elev_etc, include=FALSE, eval=FALSE}
+# rde |> 
+#   drop_na(tree_pct) |> 
+#   filter(
+#     #wria == "15",
+#     as.integer(as.character(wria)) < 26,
+#     t_imp_f != "NA",
+#     t_imp_f != "3"
+#   ) |> 
+#   mutate(rapt = riparian_ac * tree_pct) |>
+#  ggplot() +
+#   #geom_point(aes(average_elevation, rapt, color = t_imp_f), size = 0.5, show.legend = F) +
+# 
+# #  geom_point(aes(tree_pct, average_elevation, color = t_imp_f, size = riparian_ac), alpha = 0.5, show.legend = F) +
+#   geom_point(aes(average_solar, average_elevation, color = t_imp_f, size = riparian_ac), alpha = 0.5, show.legend = F) +
+# 
+#   facet_wrap(~swifd_chin + t_imp_f, ncol = 3, labeller = label_wrap_gen(multi_line = F), scales = "fixed", axes = "all") +
+#   # facet_wrap(~swifd_chin, ncol = 1, labeller = label_wrap_gen(multi_line = F), scales = "fixed") +
+# 
+#   scale_color_manual(name = "303(d)", values = pal_t_imp_f) +
+#   scale_size_area(max_size = 5) +
+#   # geom_vline(xintercept = 10, linetype = 3, linewidth = 0.5) +
+#   # geom_hline(yintercept = .75, linetype = 3, linewidth = 0.5) +
+#   # scale_y_continuous(labels = scales::label_percent()) +
+#   theme_classic() +
+#   theme(
+#     axis.line = element_line(linewidth = 0.2),
+#     strip.background = element_rect(linewidth = 0)
+#     )
 
-  facet_wrap(~swifd_chin + t_imp_f, ncol = 3, labeller = label_wrap_gen(multi_line = F), scales = "fixed", axes = "all") +
-  # facet_wrap(~swifd_chin, ncol = 1, labeller = label_wrap_gen(multi_line = F), scales = "fixed") +
-
-  scale_color_manual(name = "303(d)", values = pal_t_imp_f) +
-  scale_size_area(max_size = 5) +
-  # geom_vline(xintercept = 10, linetype = 3, linewidth = 0.5) +
-  # geom_hline(yintercept = .75, linetype = 3, linewidth = 0.5) +
-  # scale_y_continuous(labels = scales::label_percent()) +
-  theme_classic() +
-  theme(
-    axis.line = element_line(linewidth = 0.2),
-    strip.background = element_rect(linewidth = 0)
-    )
-
-```
-
-```{r}
+#canopy pattern has somewhat better separation than tree_pct for 1 vs 245
+#very little of 245 >0.5 vs fairly fat tail for 1
+#but see below, any separation not terribly meaningful, more likely artifactual
 rde |> 
   filter(
     as.integer(as.character(wria)) < 26,
@@ -512,11 +514,22 @@ rde |>
   scale_size_area(max_size = 5) +
   labs(subtitle = "SWIFD: salmon_with_chin")
 
+#but this looks hard to differentiate from sampling/spatial artifact of 303d/305b
+rde |> 
+  filter(
+    as.integer(as.character(wria)) < 26,
+    t_imp_f != "NA",  t_imp_f != "3"
+    #,swifd_chin == "salmon_with_chin"
+  ) |> 
+  ggplot() +
+  geom_boxplot(aes(canopy_pattern_metric, wria, color = t_imp_f),
+               varwidth = T, outlier.size = 0.3) +
+  scale_color_manual(name = "303(d)", values = pal_t_imp_f, aesthetics = c("color","fill")) +
+  facet_wrap(~swifd_chin, ncol = 3)
+
 ```
 
-needs development/polish, but illustrate multiwria progressive filter sequence?
-describe as "necessary but insufficient" for standardized comparison between LEs/projects
-```{r}
+```{r multi_attrib_quantile_filter_across_wrias, include=FALSE, eval=FALSE}
 #begin with W WA
 #limit to reaches with Chinook presence per SWIFD
 #then limit to 303d temp concern --> "get ahead of a problem"
@@ -535,7 +548,7 @@ rde |>
   ) |> 
   mutate(
     across(
-      c(stream_miles, rmz_ac, tree_pct, average_solar),
+      c(stream_miles, rmz_ac, canopy_pattern_metric, tree_pct, average_solar),
       list(
         # q90 = ~. >= quantile(na.omit(.), p = 0.9),
         # q10 = ~. <= quantile(na.omit(.), p = 0.1)
@@ -547,16 +560,228 @@ rde |>
   ) |> 
   filter(
     #stream_miles_q90 & tree_pct_q10 & average_solar_q10 
-    stream_miles_q75 & tree_pct_q25 & average_solar_q75 
+    #stream_miles_q75 & tree_pct_q25 & average_solar_q75 
+    stream_miles_q75 & canopy_pattern_metric_q25 & tree_pct_q25 & average_solar_q75 
   ) |>
   select(pid, wria, swifd_chin, t_imp_f, stream_name,
          stream_miles, #contains("stream"), 
          rmz_ac, #contains("rmz_ac"), 
+         canopy_pattern_metric,
          tree_pct, #contains("tree_pct"), 
          average_solar #contains("solar")
          ) |> 
   arrange(wria, desc(stream_miles), desc(rmz_ac), desc(tree_pct))
   
+
+```
+
+```{r sf_tess, include=FALSE, eval=FALSE}
+#tesselation polygons
+#per-PID, can/do have EOW and both L and R bank RMZs as well as potentially other small 'parts'
+f_gdb <- "~/T/DFW-Team WDFW Watershed Synthesis - data_common/SPTH_Tessellation.gdb/"
+l <- st_layers(f_gdb)$name
+
+# #did not break memory...23 and 24 are especially big
+# sf_tess_01_25 <- map(
+#   l[1:25],
+#   \(w){
+#       st_read(f_gdb, w) |> st_zm() |> 
+#         select(-Shape_Length, -Shape_Area) |> 
+#         rename_with(tolower) |> 
+#         mutate(
+#           wria = factor(str_sub(w,5,6)),
+#           ac = st_area(shape) |> units::set_units(acres) |> as.vector()
+#         ) |> 
+#       select(wria, pid = permanent_identifier, ac, everything())
+#   }
+# ) |> bind_rows()
+# 
+# as_tibble(sf_tess_01_25) |> count(zone)
+
+#for plotting only, no spatial operations, make a version of RMZ-only as centroid points
+#memory hungry, slow done all-at-once, so redone in map, which is also slow but stable
+# sf_tess_01_25_rmz_cntrd_pts <- sf_tess_01_25 |> 
+#   filter(zone=="RMZ") |> 
+#   group_by(pid) |> summarise() |> #combines parts
+#   st_centroid() #then gets center point
+sf_tess_01_25_rmz_cntrd_pts <- map(
+  l[1:25],
+  \(w){
+      st_read(f_gdb, w) |> 
+      st_zm() |>
+      filter(Zone=="RMZ") |> 
+      group_by(pid = permanent_identifier) |> summarise() |> #combines parts
+      st_centroid() #then gets center point
+  }
+) |> bind_rows()
+
+#a few duplicate pid split over WRIAs 
+as_tibble(sf_tess_01_25_rmz_cntrd_pts) |> count(pid) |> filter(n>1)
+
+sf_tess_01_25_rmz_cntrd_pts <- sf_tess_01_25_rmz_cntrd_pts |> 
+  distinct(pid, .keep_all = T) |> 
+  inner_join(rde, by = "pid")
+
+saveRDS(sf_tess_01_25_rmz_cntrd_pts, "sf_tess_01_25_rmz_cntrd_pts.rds")
+
+```
+
+"How to get from half a million to a couple dozen places to work"
+
+```{r gg_sf_multi_attrib_quantile_filter_across_wrias}
+sf_tess_01_25_rmz_cntrd_pts <- readRDS("sf_tess_01_25_rmz_cntrd_pts.rds")
+
+sf_tess_01_25_rmz_cntrd_pts |> 
+  slice_sample(n = 200000) |> 
+  ggplot() + geom_sf(size = 0.2, alpha = 0.1)
+
+sf_tess_01_25_rmz_cntrd_pts |> 
+  slice_sample(n = 200000) |> 
+  ggplot() + geom_sf(aes(color = t_imp_f), size = 0.2, alpha = 0.2) +
+  scale_color_manual(values = pal_t_imp_f)
+
+sf_tess_01_25_rmz_cntrd_pts |> 
+  filter(t_imp_f != "NA") |> 
+  ggplot() + geom_sf(aes(color = t_imp_f), size = 0.2, alpha = 0.2) +
+  scale_color_manual(values = pal_t_imp_f)
+
+sf_tess_01_25_rmz_cntrd_pts |> 
+  slice_sample(n = 200000) |> 
+  ggplot() + geom_sf(aes(color = swifd_chin), size = 0.2, alpha = 0.2) +
+  scale_color_manual(values = pal_swifd_chin)
+
+sf_tess_01_25_rmz_cntrd_pts |> 
+  filter(
+    swifd_chin == "salmon_with_chin"
+  ) |> 
+  ggplot() + geom_sf(aes(color = swifd_chin), size = 0.2, alpha = 0.2, show.legend = F) +
+  scale_color_manual(values = pal_swifd_chin) +
+  labs(subtitle = "SWIFD: Chinook")
+
+sf_tess_01_25_rmz_cntrd_pts |> 
+  filter(
+    swifd_chin == "salmon_with_chin",
+    t_imp_f == "2"
+  ) |> 
+  ggplot() + geom_sf(aes(color = t_imp_f), size = 0.2, alpha = 0.2, show.legend = F) +
+  scale_color_manual(values = pal_t_imp_f) +
+  labs(subtitle = "SWIFD: Chinook\n303(d) Cat2 'water temp concern'")
+
+d <- sf_tess_01_25_rmz_cntrd_pts |> 
+  filter(
+    swifd_chin == "salmon_with_chin",
+    t_imp_f == "2"
+  ) |> 
+  mutate(
+    across(
+      c(stream_miles, rmz_ac, canopy_pattern_metric, tree_pct, average_solar),
+      list(
+        q75 = ~. >= quantile(na.omit(.), p = 0.75),
+        q25 = ~. <= quantile(na.omit(.), p = 0.25)
+      )
+    ),
+    .by = c(wria, swifd_chin, t_imp_f)
+  ) 
+
+ggplot() + 
+  geom_sf(data = d, color = pal_t_imp_f["2"], size = 0.2, alpha = 0.2, show.legend = F) +
+  geom_sf(
+    data = d |> 
+      filter(stream_miles_q75 & canopy_pattern_metric_q25 & tree_pct_q25 & average_solar_q75) 
+    ,
+    aes(color = canopy_pattern_metric, size = stream_miles)
+    ) +
+  wacolors::scale_color_wa_c(palette = "gorge", limits = c(0,1), reverse = T) +
+  labs(
+    subtitle = "SWIFD: Chinook\n303(d) Cat2 'water temp concern'\nstream_miles > 75th\ntree cover & canopy pattern < 25th\navg solar > 75th"
+    )
+
+```
+
+
+[Siegel et al. 2023](https://journals.plos.org/water/article?id=10.1371/journal.pwat.0000119) estimated daily stream temperature for the medium resolution NHD+ COMID (flowline+local catchment)
+Values here are from the [publicly available datasets of results](https://zenodo.org/records/8174951)
+
+```{r st_pred, eval=FALSE}
+##single HUC10 prediction file is n-COMIDs by n-days in 1990-2021
+##given sf_pts need to know point(s) HUC10 to figure out model prediction file
+##then need to know point(s) COMID since values are by COMID-day
+##but points/reach may or may not actually be in the dataset which excludes artificial paths etc.
+## HUC6 folders of HUC10s: 171100 - PS, 171001 - Coast
+
+#do not know designated uses, and not going to start with running 7day max
+#so formulate a simplistic quasi-category based on days over thresholds 16/18/20
+#to demo concept, rather than flow_dash approach of getting huc10 & COMID by service,
+#instead first summarize across COMIDs within HUC10
+
+#just this is 7.5m rows
+stp <- map_df(
+  c("1711000801", #"Stilly NF"
+    "1711000802", #"Stilly SF"
+    "1711000803" #"Stilly Lower"
+  ), 
+  ~read_csv(paste0("~/T/DFW-Team WDFW Watershed Synthesis - data_common/st_pred/st_pred_171100/st_pred_",.x,".csv")) |>
+    select(date = tim.date, COMID, st_pred = prd.stream_temp)
+)
+
+#stp |> count(COMID) |> filter(n!=11688) #n-days
+
+stp_over <- stp |> 
+  summarise(
+    across(
+      st_pred,
+      list(
+        n_16 = ~sum(. > 16, na.rm = T),
+        n_18 = ~sum(. > 18, na.rm = T),
+        n_20 = ~sum(. > 20, na.rm = T)
+      )),
+    .by = COMID
+  ) |> 
+  mutate(
+    across(contains("_n_"), list(pct = ~./11688))
+  )
+
+stp_over |> 
+  select(COMID, ends_with("pct")) |> 
+  pivot_longer(ends_with("pct")) |> 
+  ggplot() + geom_density(aes(value, color = name)) + facet_wrap(~name, scales = "free")
+
+sf_flw <- readRDS("~/T/DFW-Team WDFW Watershed Synthesis - flow_trees_heat/sf_nhdp_wa_flw.rds") |>
+  sf::st_zm() |> 
+  inner_join(stp_over, by = "COMID")
+
+mapview::mapview(sf_flw, zcol = "st_pred_n_20")
+
+{
+  ggplot() + 
+  geom_sf(data = sf_flw, color = "lightblue", linewidth = 0.3) + 
+  geom_sf(data = sf_flw |> filter(st_pred_n_16 > 0), aes(color = st_pred_n_16_pct)) + 
+  wacolors::scale_color_wa_c("sea_star")
+}+{
+  ggplot() + 
+  geom_sf(data = sf_flw, color = "lightblue", linewidth = 0.3) + 
+  geom_sf(data = sf_flw |> filter(st_pred_n_18 > 0), aes(color = st_pred_n_18_pct)) + 
+  wacolors::scale_color_wa_c("sea_star")
+}+{
+  ggplot() + 
+  geom_sf(data = sf_flw, color = "lightblue", linewidth = 0.3) + 
+  geom_sf(data = sf_flw |> filter(st_pred_n_20 > 0), aes(color = st_pred_n_20_pct)) + 
+  wacolors::scale_color_wa_c("sea_star")
+}+plot_layout(ncol = 1)
+
+
+
+
+distinct(stp, COMID) |> 
+  inner_join(sites, by = "COMID")
+  # split(~site_no) |> 
+  # map(
+  #   ~left_join(
+  #     .x |> select(site_no, COMID),
+  #     stp,
+  #     by = "COMID") |> 
+  #     saveRDS(paste0("data/nwfsc_st_pred_",.x$site_no,".rds"))
+  # )
 
 ```
 
