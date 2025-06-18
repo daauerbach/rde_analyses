@@ -27,6 +27,10 @@ theme_set(theme_minimal())
 dir_data_common <- "~/T/DFW-Team WDFW Watershed Synthesis - data_common"
 epsg <- 2927 #WA state standard; NAD83(HARN)/ft
 
+#sort(unique(rde$t_imp_f))
+pal_t_imp_f <- c("1" = "darkgreen", "2" = "orange", "3" = "yellow", "4|5" = "#965127", "NA" = "grey") 
+pal_swifd_chin <- c("not_salmon" = NA, "salmon_not_chin" = "tan", "salmon_with_chin" = "salmon")
+
 ```
 
 The [Riparian Data Engine (RDE)](https://ripariandata.wdfw.wa.gov/), developed by WDFW with support from ESA, is a geospatial web application that "unites WDFW riparian datasets in Washington State...allow[ing] planners to evaluate the conditions of riparian ecosystems and make data-informed planning decisions".
@@ -132,7 +136,7 @@ rde |>
 
 ```
 
-The Statewide Integrated Fish Distribution (SWIFD) data characterize the documented and presumed presence of several salmonid species. For an initial examination, the `pid` units can be stratified according to whether Chinook are included in the set of species present in SWIFD for the location.
+The Statewide Integrated Fish Distribution (SWIFD) data characterize the documented and presumed presence of several salmonid species. For an initial examination, the `pid` units can be stratified according to whether Chinook are included in the set of species present in SWIFD for the location. As expected, the total areas of riparian and open water extent are greater for reaches designated by SWIFD as Chinook-occupied, despite the smaller total number of these (larger) river network units. 
 
 ```{r rde_swifd_chin}
 rde <- rde |>
@@ -144,8 +148,6 @@ rde <- rde |>
     )
   )
 ```
-
-Not that, as expected, the total areas of riparian and open water extent are greater for reaches designated by SWIFD as Chinook-occupied, despite the smaller total number of these (larger) river network units. 
 
 ```{r gt_rde_swifd_chin}
 rde |> 
@@ -204,12 +206,8 @@ rde_smry_wria <- rde |>
   arrange(wria, swifd_chin, t_imp_f)
 ```
 
-# Visualizations
 
-```{r pals, include=FALSE}
-pal_t_imp_f <- c("1" = "darkgreen", "2" = "orange", "3" = "yellow", "4|5" = "#965127", "NA" = "grey") #sort(unique(rde$t_imp_f))
-pal_swifd_chin <- c("not_salmon" = NA, "salmon_not_chin" = "tan", "salmon_with_chin" = "salmon")
-```
+# Visualizations
 
 ## Statewide 
 
@@ -277,6 +275,8 @@ rde_smry |>
 
 ## WRIAs 1-25 (Western WA)
 
+### Total area by SWIFD & 303d types
+
 ```{r gg_pct_meeting_wria, include=F, eval=F}
 # rde_smry_wria |> 
 #   filter(as.integer(as.character(wria)) < 26, swifd_chin == "salmon_with_chin") |> 
@@ -331,6 +331,8 @@ rde_smry_wria |>
     legend.position = "top"
   )
 ```
+
+### Tree cover proportion by SWIFD & 303d
 
 These data show a more complicated relationship between assessed water temperature category and the per-reach percentage cover of trees in the riparian corridor (RMZ+EOW). In accordance with conventional expectations, the plot below illustrates that impaired or "concern[ing]" conditions (categories 5,4,2) are associated with lower average riparian tree cover in many WRIAs (i.e., orange/brown points to the left of green). However, the average percent tree cover is similar among 303(d) categories in several instances and occasionally greater for meeting standards reaches. For example, the higher temperature categories in WRIA 15 (Kitsap) have lower tree cover in each SWIFD type (brown/orange left of green), whereas the "not salmon" type reverses this pattern in WRIA 8 and the "with Chinook" category 1 reaches have lower average tree cover in WRIA 3 (lower Skagit). Moreover, lower or similar tree cover for category 1 reaches is present in all SWIFD types in WRIA 25. Nonetheless, the generally larger areal extents of impaired categories remain apparent, shown as the scaled size of the points for per-WRIA means. The coarse spatial scale of this analysis and the varied potential causes of elevated stream temperatures make these results unsurprising, but they underscore the need for caution and consideration of local factors when extrapolating from a robust site-scale mechanism (trees create shade) to a landscape-scale diagnosis (lack of trees impairs water temperature) or prescription (increasing riparian tree cover will decrease impairment).
 
@@ -456,6 +458,120 @@ rde |>
   )
 
 ```
+
+## HRCD tree loss
+
+Reach table does not include "impervious increase", but does not distinguish change agents, to differentiate, for example, "forestry" from "development"
+
+```{r}
+rde |> 
+  summarise(
+    across(
+      c(riparian_ac, #rmz_ac, #all_land_cover_ac, all_tree_cover_ac,
+        anth_chg_ac = anthropogenic_change_origin_ac), 
+      list(sum = ~sum(., na.rm = T))
+      ),
+    .by = c(swifd_chin)
+  ) |> 
+  mutate(anth_pct = anth_chg_ac_sum / riparian_ac_sum)
+
+rde |> 
+  summarise(
+    across(
+      c(riparian_ac, anth_chg_ac = anthropogenic_change_origin_ac), 
+      list(sum = ~sum(., na.rm = T))
+      ),
+    .by = c(swifd_chin, t_imp_f)
+  ) |> 
+  mutate(anth_pct = anth_chg_ac_sum / riparian_ac_sum) |> 
+  arrange(swifd_chin, t_imp_f)
+
+rde |> 
+  summarise(
+    across(
+      c(riparian_ac, anth_chg_ac = anthropogenic_change_origin_ac), 
+      list(sum = ~sum(., na.rm = T))
+      ),
+    .by = c(wria, swifd_chin, t_imp_f)
+  ) |> 
+  mutate(anth_pct = anth_chg_ac_sum / riparian_ac_sum) |> 
+  arrange(wria, swifd_chin, t_imp_f) |> 
+  filter(
+    swifd_chin == "salmon_with_chin",
+    t_imp_f %in% c("1","2","4|5")
+  ) |> 
+  ggplot() +
+  #geom_boxplot(aes(swifd_chin, anth_pct, color = t_imp_f), varwidth = T) +
+  geom_point(aes(t_imp_f, anth_pct, colour = t_imp_f, group = wria)) +
+  geom_line(aes(t_imp_f, anth_pct, colour = t_imp_f, group = wria), linewidth = 0.3) +
+  scale_color_manual(name = "303(d)", values = pal_t_imp_f)
+
+rde |> 
+  filter(
+    #swifd_chin == "salmon_with_chin",
+    t_imp_f %in% c("1","2","4|5")
+    ) |> 
+  mutate(t_imp_f_245 = if_else(t_imp_f != "1","impaired|concern","meeting_standard")) |> 
+  summarise(
+    across(
+      c(riparian_ac, anth_chg_ac = anthropogenic_change_origin_ac), 
+      list(sum = ~sum(., na.rm = T))
+      ),
+    .by = c(wria, swifd_chin, t_imp_f_245)
+  ) |> 
+  mutate(anth_pct = anth_chg_ac_sum / riparian_ac_sum) |> 
+  arrange(wria, swifd_chin, t_imp_f_245) |> 
+  ggplot(aes(t_imp_f_245, anth_pct, group = wria)) +
+  geom_point(aes(colour = t_imp_f_245, size = anth_chg_ac_sum), alpha = 0.6) + 
+  geom_line(linewidth = 0.2, alpha = 0.3) +
+  scale_color_manual(name = "303(d)", values = c("#965127","darkgreen")) +
+  facet_wrap(~swifd_chin, ncol = 1)
+
+rde |> 
+  filter(
+    #swifd_chin == "salmon_with_chin",
+    t_imp_f %in% c("1","2","4|5")
+    ) |> 
+  mutate(t_imp_f_245 = if_else(t_imp_f != "1","impaired|concern","meeting_standard")) |> 
+  summarise(
+    across(
+      c(riparian_ac, all_tree_cover_ac, anth_chg_ac = anthropogenic_change_origin_ac), 
+      list(sum = ~sum(., na.rm = T))
+      ),
+    .by = c(wria, swifd_chin, t_imp_f_245)
+  ) |> 
+  mutate(anth_pct = anth_chg_ac_sum / riparian_ac_sum) |> 
+  arrange(wria, swifd_chin, t_imp_f_245) |> 
+  ggplot(aes(swifd_chin, wria)) +
+  geom_point(aes(size = riparian_ac_sum), color = "tan", alpha = 0.6) + 
+  geom_point(aes(size = all_tree_cover_ac_sum), color = "darkgreen", alpha = 0.6) + 
+  geom_point(aes(size = anth_chg_ac_sum), color ="orange", alpha = 0.6) + 
+  scale_size_area() +
+  facet_wrap(~t_imp_f_245, ncol = 2)
+
+rde |> 
+  filter(t_imp_f %in% c("1","2","4|5")) |> 
+  mutate(t_imp_f_245 = if_else(t_imp_f != "1","impaired|concern","meeting_standard")) |> 
+  summarise(
+    across(
+      c(riparian_ac, all_tree_cover_ac, anth_chg_ac = anthropogenic_change_origin_ac), 
+      list(sum = ~sum(., na.rm = T))
+      ),
+    .by = c(wria, swifd_chin, t_imp_f_245)
+  ) |> 
+  mutate(anth_pct = anth_chg_ac_sum / riparian_ac_sum) |> 
+  arrange(wria, swifd_chin, t_imp_f_245) |> 
+  filter(str_detect(t_imp_f_245, "impair")) |> 
+  ggplot(aes(y = wria)) +
+  geom_col(aes(x = riparian_ac_sum), fill = "tan", alpha = 0.6) + 
+  geom_col(aes(x = all_tree_cover_ac_sum), fill = "darkgreen", alpha = 0.6) + 
+  geom_col(aes(x = anth_chg_ac_sum), fill ="orange", alpha = 0.6) + 
+  scale_x_log10(labels = scales::label_log()) +
+  facet_wrap(~swifd_chin, ncol = 3)
+
+```
+
+
 
 # Multi-WRIA multi-attribute filter
 
