@@ -461,30 +461,37 @@ rde |>
 
 ## HRCD tree loss
 
-Reach table does not include "impervious increase", but does not distinguish change agents, to differentiate, for example, "forestry" from "development"
+Reach table does not include "impervious increase", but also does not distinguish change agents and cannot differentiate, for example, "forestry" from "development"
 
-```{r}
+Across WRIAs, within Chinook habitat, the riparian areas of reaches with temperature impairment or concerns had greater anthropogenic tree loss.
+
+```{r gt_allwria_anth_pct}
+#across wrias totals tabulations
+#too much conflation of change agents and lowland/upland position etc across wrias
+#but still worth noting the pct in with_chin 4|5 > 2 > 1
 rde |> 
   summarise(
     across(
-      c(riparian_ac, #rmz_ac, #all_land_cover_ac, all_tree_cover_ac,
-        anth_chg_ac = anthropogenic_change_origin_ac), 
+      c(riparian_ac, anth_chg_ac = anthropogenic_change_origin_ac), #all_land_cover_ac, all_tree_cover_ac,
       list(sum = ~sum(., na.rm = T))
       ),
-    .by = c(swifd_chin)
-  ) |> 
-  mutate(anth_pct = anth_chg_ac_sum / riparian_ac_sum)
-
-rde |> 
-  summarise(
-    across(
-      c(riparian_ac, anth_chg_ac = anthropogenic_change_origin_ac), 
-      list(sum = ~sum(., na.rm = T))
-      ),
+    #.by = c(swifd_chin)
     .by = c(swifd_chin, t_imp_f)
   ) |> 
   mutate(anth_pct = anth_chg_ac_sum / riparian_ac_sum) |> 
-  arrange(swifd_chin, t_imp_f)
+  arrange(swifd_chin, t_imp_f) |> 
+  filter(
+    #swifd_chin == "salmon_with_chin",
+    t_imp_f %in% c("1","2","4|5")
+  ) |> 
+  gt(groupname_col = "swifd_chin") |> 
+  fmt_number(ends_with("sum"), decimals = 0) |> 
+  fmt_percent(ends_with("pct"), decimals = 1)
+```
+
+```{r gg_parallel_anth_pct, include=FALSE, eval=FALSE}
+#the pct for common scale is not especially informative, especially for the 'not_salmon',
+#due to combination of 1) small sample of cat1 and 2) relative landscape positioning of forestry and these typically smaller/higher reaches
 
 rde |> 
   summarise(
@@ -526,7 +533,11 @@ rde |>
   geom_line(linewidth = 0.2, alpha = 0.3) +
   scale_color_manual(name = "303(d)", values = c("#965127","darkgreen")) +
   facet_wrap(~swifd_chin, ncol = 1)
+```
 
+```{r gg_coencentric_anth_ac, include=FALSE, eval=FALSE}
+#this is arguably better than pct while still conveying relative quantities
+#but still harder to judge precisely and basically unreadable as a single plot
 rde |> 
   filter(
     #swifd_chin == "salmon_with_chin",
@@ -548,26 +559,287 @@ rde |>
   geom_point(aes(size = anth_chg_ac_sum), color ="orange", alpha = 0.6) + 
   scale_size_area() +
   facet_wrap(~t_imp_f_245, ncol = 2)
+```
 
-rde |> 
-  filter(t_imp_f %in% c("1","2","4|5")) |> 
-  mutate(t_imp_f_245 = if_else(t_imp_f != "1","impaired|concern","meeting_standard")) |> 
+```{r gg_bar_anth_ac}
+# #tree loss change excluding notsalmon & meeting
+# #acres scale still difficult, needs log10 to see anth_chg but that makes harder to judge intuitively
+# rde |> 
+#   filter(t_imp_f %in% c("1","2","4|5")) |> 
+#   mutate(t_imp_f_245 = if_else(t_imp_f != "1","impaired|concern","meeting_standard")) |> 
+#   summarise(
+#     across(
+#       c(riparian_ac, all_tree_cover_ac, anth_chg_ac = anthropogenic_change_origin_ac), 
+#       list(sum = ~sum(., na.rm = T))
+#       ),
+#     .by = c(wria, swifd_chin, t_imp_f_245)
+#   ) |> 
+#   mutate(anth_pct = anth_chg_ac_sum / riparian_ac_sum) |> 
+#   arrange(wria, swifd_chin, t_imp_f_245) |> 
+#   filter(
+#     as.integer(as.character(wria)) < 26,
+#     swifd_chin != "not_salmon",
+#     str_detect(t_imp_f_245, "impair")
+#     ) |> 
+#   ggplot(aes(y = wria)) +
+#   geom_col(aes(x = riparian_ac_sum), fill = "tan", alpha = 0.6) + 
+#   geom_col(aes(x = all_tree_cover_ac_sum), fill = "darkgreen", alpha = 0.6) + 
+#   geom_col(aes(x = anth_chg_ac_sum), fill ="orange", alpha = 0.6) + 
+#   scale_x_log10(labels = scales::label_log()) +
+#   facet_wrap(~swifd_chin, ncol = 3)
+
+# #tree loss change within salmon AND impaired|concern reaches
+# #better/okay for seeing among-wria but
+# #conflates landscape pattern with 303d determination extent/footprint
+# rde |>
+#   filter(
+#     swifd_any,
+#     t_imp_f %in% c("2","4|5")
+#     ) |>
+# #  mutate(t_imp_f_245 = if_else(t_imp_f != "1","impaired|concern","meeting_standard")) |>
+#   summarise(
+#     across(
+#       c(riparian_ac, all_tree_cover_ac, anth_chg_ac = anthropogenic_change_origin_ac),
+#       list(sum = ~sum(., na.rm = T))
+#       ),
+#  #   .by = c(wria, t_imp_f_245)
+#     .by = c(wria)
+#   ) |>
+#   mutate(anth_pct = anth_chg_ac_sum / riparian_ac_sum) |>
+# #  arrange(wria, t_imp_f_245) |>
+#   filter(
+#     as.integer(as.character(wria)) < 26
+#     # ,
+#     # swifd_chin != "not_salmon",
+#     # str_detect(t_imp_f_245, "impair")
+#     ) |>
+#   #arrange(anth_pct) |> print(n=Inf)
+#   ggplot(aes(y = wria)) +
+#   geom_col(aes(x = riparian_ac_sum), fill = "tan", alpha = 0.6) +
+#   geom_col(aes(x = all_tree_cover_ac_sum), fill = "darkgreen", alpha = 0.6) +
+#   geom_col(aes(x = anth_chg_ac_sum), fill ="orange", alpha = 0.6)
+
+
+##tree loss change in W WA salmon reaches, ignoring 303d
+rde_anth_wria_any <- rde |>
   summarise(
     across(
-      c(riparian_ac, all_tree_cover_ac, anth_chg_ac = anthropogenic_change_origin_ac), 
+      c(riparian_ac, all_tree_cover_ac, 
+        anth_chg_ac = anthropogenic_change_origin_ac),
       list(sum = ~sum(., na.rm = T))
       ),
-    .by = c(wria, swifd_chin, t_imp_f_245)
-  ) |> 
-  mutate(anth_pct = anth_chg_ac_sum / riparian_ac_sum) |> 
-  arrange(wria, swifd_chin, t_imp_f_245) |> 
-  filter(str_detect(t_imp_f_245, "impair")) |> 
+    .by = c(wria, swifd_any)
+  )
+
+# # #back to scale display problem: larger abs losses in notsalmon
+# rde_anth_wria_any |> 
+#   filter(as.integer(as.character(wria)) < 26) |>
+#   mutate(anth_pct = anth_chg_ac_sum / riparian_ac_sum) |>
+#   ggplot(aes(y = wria)) +
+#   geom_col(aes(x = riparian_ac_sum), fill = "tan", alpha = 0.6) +
+#   geom_col(aes(x = all_tree_cover_ac_sum), fill = "darkgreen", alpha = 0.6) +
+#   geom_col(aes(x = anth_chg_ac_sum), fill ="orange", alpha = 0.6) +
+#   facet_wrap(~swifd_any) + scale_x_log10()
+
+
+#this is good for seeing across wrias within each T/F and acres-fill-color cols
+#but still hard to see diffs in ratios
+rde_anth_wria_any |> 
+  filter(as.integer(as.character(wria)) < 26) |>
+  pivot_longer(cols = ends_with("sum")) |> #pull(name) |> unique() |> sort()
+  mutate(
+    swifd_any = if_else(swifd_any, "salmon","not salmon"),
+    name = factor(name, levels = sort(unique(name))[c(3,1,2)])
+    ) |> 
   ggplot(aes(y = wria)) +
-  geom_col(aes(x = riparian_ac_sum), fill = "tan", alpha = 0.6) + 
-  geom_col(aes(x = all_tree_cover_ac_sum), fill = "darkgreen", alpha = 0.6) + 
-  geom_col(aes(x = anth_chg_ac_sum), fill ="orange", alpha = 0.6) + 
-  scale_x_log10(labels = scales::label_log()) +
-  facet_wrap(~swifd_chin, ncol = 3)
+  geom_col(aes(x = value, fill = name, alpha = swifd_any), position = "dodge") + 
+  scale_x_continuous(labels = scales::comma) +
+  scale_fill_manual(values = c("tan","darkgreen","orange"), guide = "none") +
+  scale_alpha_manual(values = c(0.3, 0.9)) +
+  facet_wrap(~name, scales = "free_x") +
+  labs(x = "total acres", y = NULL) +
+  theme(legend.position = "top")
+
+
+
+# rde_anth_wria_any |> 
+#   filter(as.integer(as.character(wria)) < 26) |>
+#   mutate(swifd_any = if_else(swifd_any, "salmon","not salmon")) |> 
+#   pivot_longer(ends_with("sum")) |> 
+#   pivot_wider(names_from = swifd_any, values_from = value) |> 
+#   ggplot() + geom_point(aes(`not salmon`, salmon, color = name), show.legend = F) + geom_abline(slope = 1, linetype = 3) + facet_wrap(~name, scales = "free")
+
+
+rde |> 
+  summarise(
+    across(c(riparian_ac), list(sum = ~sum(., na.rm = T))),
+    across(tree_pct, list(
+        mean = ~mean(., na.rm = T),
+        sd = ~sd(., na.rm = T)
+        ))
+    ,.by = c(wria, swifd_any)
+  )
+
+#complex figure. not sure if still too much unpacking needed?
+#within each WRIA, some set of reaches is designated by SWIFD as having salmonid use; 
+#the x-axis shows this 'salmon-extent' as the proportion of the total riparian acreage (0 no salmon to 1 all salmon); 
+#similarly, some portion of the total acreage has tree cover, and this total treed area can be distinguished by salmon use
+#so, green points show the proportion of the total riparian tree-cover acreage for the salmon-extent (y-axis/vertical position) relative to the overall proportion of riparian area (x-axis/horizontal) of that same extent (i.e., set of reaches);
+#green points near the 1:1 line indicate that the salmon-reaches/salmon-extent make up a similar proportion of the area of tree cover as of the full riparian area, suggesting that tree cover is more evenly distributed across salmon and non-salmon portions of the network
+#green points above the 1:1 line indicate a greater proportion than the null expectation based solely on riparian acreage, suggesting that tree cover is relatively concentrated within the salmon-extent reaches 
+#green points below the 1:1 line indicate a lower proportion of tree area is salmon-extent than the null expectation, suggesting that tree cover is relatively lacking within these reaches
+#the total anthropogenic tree loss within the wria riparian area can also be distinguished by salmon/SWIFD
+#orange points show how the proportion of this loss within the salmon-extent compares with both tree cover (green points) and the overall proportion of riparian area:
+#orange points below green suggest tree losses were distributed outside of salmon-reaches, whereas orange above green suggests tree losses were more associated with the salmon-extent
+#both of these relationships can occur above, below, or across the 1:1 line; for example, the area of salmon/SWIFD reaches in WRIA 12 was ~36% of the total riparian area, but these reaches were associated with ~44% of the tree cover (above 1:1), yet ~24% of tree loss area (below 1:1)
+
+rde_anth_wria_any |> 
+  filter(as.integer(as.character(wria)) < 26) |>
+  mutate(
+    across(ends_with("sum"), list(pct = ~./sum(.))),
+    .by = wria
+  ) |> 
+  #filter(wria %in% c("4","6","8","12")) |> arrange(wria, swifd_any)
+  filter(swifd_any) |>
+#ggplot(aes(riparian_ac_sum_pct, all_tree_cover_ac_sum_pct)) + geom_point(aes(color = swifd_any)) + 
+ggplot() + 
+  geom_abline(slope = 1, linetype = 3) +
+  # geom_point(aes(riparian_ac_sum_pct, all_tree_cover_ac_sum_pct, size = riparian_ac_sum/10), color = "darkgreen") + 
+  # geom_point(aes(riparian_ac_sum_pct, anth_chg_ac_sum_pct, size = anth_chg_ac_sum), color = "orange") + 
+  geom_segment(aes(
+    riparian_ac_sum_pct, all_tree_cover_ac_sum_pct,
+    xend = riparian_ac_sum_pct, yend = anth_chg_ac_sum_pct),
+    arrow = arrow(20, length = unit(0.015, "npc"), type = "open"), arrow.fill = "orange",
+    linetype = 1, linewidth = 0.3, color = "grey30"
+  ) +
+  geom_point(aes(riparian_ac_sum_pct, all_tree_cover_ac_sum_pct, size = riparian_ac_sum/10), color = "darkgreen") + 
+  geom_point(aes(riparian_ac_sum_pct, anth_chg_ac_sum_pct, size = anth_chg_ac_sum), color = "orange") + 
+  geom_text(aes(riparian_ac_sum_pct, anth_chg_ac_sum_pct, label = wria),
+            size = 3,
+            #position = "jitter"
+            nudge_x = 0.005, nudge_y = -0.003
+            ) +
+  scale_size_area(max_size = 5, guide = "none") +
+  labs(
+    title = "Proportions of total tree cover and tree loss\nfor reaches with salmon use (SWIFD) in W WA WRIAs",
+    subtitle = "Points sized by relative area",
+    x = "Salmon/SWIDF proportion of total riparian acres",
+    y = "Prop. of total riparian tree cover acres (green) or tree loss (orange) acres"
+  ) +
+  annotate("segment", x = 0.05, y = -0.01, xend = 0.5, yend = -0.01, arrow = arrow()) +
+  annotate("text", x = 0.15, y = 0, label = "Salmon/SWIFD extent is more of total network/riparian area", hjust = 0) +
+  annotate("segment", x = 0.01, y = 0, xend = 0.01, yend = 0.5, arrow = arrow(), color = "darkgreen") +
+  annotate("text", x = 0.03, y = 0.43, label = "More of treed riparian area assoc. with salmon/SWIFD", hjust = 0, color = "darkgreen") +
+  annotate("segment", x = 0.02, y = 0, xend = 0.02, yend = 0.5, arrow = arrow(), color = "orange") +
+  annotate("text", x = 0.03, y = 0.4, label = "More of tree loss area assoc. with salmon/SWIFD ", hjust = 0, color = "orange") +
+  coord_cartesian(clip = "off")
+
+
+#not especially helpful: sf_tess_01_25_rmz_cntrd_pts |> filter(wria == "8") |> ggplot() + geom_sf(aes(color = all_tree_cover_ac)) + facet_wrap(~swifd_any)
+#but this is somewhat interesting: sf_tess_01_25_rmz_cntrd_pts |> filter(wria == "4") |> ggplot() + geom_sf(aes(color = all_tree_cover_ac > 0)) + facet_wrap(~swifd_any)
+
+#facet column vs column: tree/riparian and anth/tree by swifd per wria
+
+#strange plot, probably not a keeper
+##tree acres per riparian acres, relative to any-SWIFD extent
+rde_anth_wria_any |>
+  filter(as.integer(as.character(wria)) < 26) |>
+  mutate(
+    swifd_any = if_else(swifd_any, "salmon","not salmon"),
+    tree_ac_rip_ac = all_tree_cover_ac_sum / riparian_ac_sum
+  ) |>
+#  select(-ends_with("sum")) |> 
+  pivot_wider(names_from = swifd_any, values_from = where(is.numeric)) |> 
+  ggplot(aes(`tree_ac_rip_ac_not salmon`, tree_ac_rip_ac_salmon)) +
+  # geom_point(aes(size = riparian_ac_sum_salmon, color = tree_ac_rip_ac_salmon),
+  #            alpha = 0.7, show.legend = F) +
+  geom_point(aes(size = `riparian_ac_sum_not salmon`), color = "yellow",
+             alpha = 0.5, show.legend = F) +
+  geom_point(aes(size = riparian_ac_sum_salmon), color = "purple",
+             alpha = 0.5, show.legend = F) +
+  geom_text(aes(label = wria), position = "jitter") +
+  geom_abline(slope = 1, linetype = 3, linewidth = 0.5) +
+#  wacolors::scale_color_wa_c("gorge", limits = c(0,1), reverse = T) +
+  labs(
+    x = "Tree acres per riparian acres, outside SWIFD",
+    y = "Tree acres per riparian acres, within SWIFD",
+    subtitle = "Point size scale to total riparian acres within SWIFD"
+  )
+
+#another (earlier) version - visually simpler but also hard to capture/show multiple among strata relationships
+#larger 'not salmon' bars indicate reaches outside SWIFD have higher total proportion of tree cover
+#this shows bar-diffs clearly but is tricky since very different abs acres between bars (within and among wrias)
+rde_anth_wria_any |>
+  filter(as.integer(as.character(wria)) < 26) |>
+  mutate(
+    swifd_any = if_else(swifd_any, "salmon","not salmon"),
+    tree_rip_pct = all_tree_cover_ac_sum / riparian_ac_sum,
+    anth_tree_pct = anth_chg_ac_sum / all_tree_cover_ac_sum
+  ) |>
+  ggplot() +
+  geom_col(aes(tree_rip_pct, wria, alpha = swifd_any), fill = "darkgreen", position = "dodge", width = 0.7) +
+  scale_alpha_manual(values = c(0.3, 0.9)) +
+  labs(x = "total (tree ac / riparian ac)", y = NULL) +
+  theme(legend.position = "top")
+#same but showing abs acres as bar width
+rde_anth_wria_any |> 
+  filter(as.integer(as.character(wria)) < 26) |>
+  mutate(
+    swifd_any = if_else(swifd_any, "salmon","not salmon"),
+    tree_rip_pct = all_tree_cover_ac_sum / riparian_ac_sum,
+    anth_tree_pct = anth_chg_ac_sum / all_tree_cover_ac_sum
+  ) |> 
+  ggplot() + 
+  geom_col(aes(tree_rip_pct, swifd_any, alpha = swifd_any, width = riparian_ac_sum), fill = "darkgreen", position = "dodge2") +
+  scale_alpha_manual(values = c(0.3, 0.9)) +
+  labs(x = "total (tree ac / riparian ac)", y = NULL) +
+  facet_wrap(~wria, ncol = 1, strip.position = "left") +
+  theme(legend.position = "top", axis.text.y = element_blank())
+
+#as above, showing between-SWIFD diffs but obscuring diffs in abs areas
+rde_anth_wria_any |> 
+  filter(as.integer(as.character(wria)) < 26) |>
+  mutate(
+    swifd_any = if_else(swifd_any, "salmon","not salmon"),
+    tree_rip_pct = all_tree_cover_ac_sum / riparian_ac_sum,
+    anth_tree_pct = anth_chg_ac_sum / all_tree_cover_ac_sum
+  ) |> 
+  ggplot() + 
+  geom_col(aes(anth_tree_pct, wria, alpha = swifd_any), fill = "orange", position = "dodge") +
+  scale_alpha_manual(values = c(0.3, 0.9)) +
+  labs(x = "total (tree loss ac / tree ac)", y = NULL) +
+  theme(legend.position = "top")
+#with acreage-varied widths
+rde_anth_wria_any |> 
+  filter(as.integer(as.character(wria)) < 26) |>
+  mutate(
+    swifd_any = if_else(swifd_any, "salmon","not salmon"),
+    tree_rip_pct = all_tree_cover_ac_sum / riparian_ac_sum,
+    anth_tree_pct = anth_chg_ac_sum / all_tree_cover_ac_sum
+  ) |> 
+  ggplot() + 
+  geom_col(aes(anth_tree_pct, swifd_any, alpha = swifd_any, width = riparian_ac_sum), fill = "orange", position = "dodge2") +
+  scale_alpha_manual(values = c(0.3, 0.9)) +
+  labs(x = "total (tree loss ac / tree ac)", y = NULL) +
+  facet_wrap(~wria, ncol = 1, strip.position = "left") +
+  theme(legend.position = "top", axis.text.y = element_blank())
+
+
+
+#tabulating numbers to stare at
+rde_anth_wria_any |> 
+  filter(as.integer(as.character(wria)) < 26) |>
+  mutate(
+    swifd_any = if_else(swifd_any, "salmon","not salmon"),
+    tree_rip_pct = all_tree_cover_ac_sum / riparian_ac_sum,
+    anth_tree_pct = anth_chg_ac_sum / all_tree_cover_ac_sum
+  ) |> 
+  mutate(
+    across(ends_with("sum"), list(pct = ~./sum(.))),
+    .by = wria
+  ) |> 
+  arrange(wria, swifd_any) |> print(n = Inf)
+  
 
 ```
 
