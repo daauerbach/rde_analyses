@@ -47,6 +47,13 @@ This analysis broadens to a regional scale, quantifying patterns per-WRIA, based
 
 # Data
 
+```{r sf_wrias, include=FALSE, eval=FALSE}
+sf_wrias <- sf::read_sf(file.path(dir_data_common, "WR_WAT_WRIA.gdb/")) |>
+  mutate(wria = paste0(str_pad(WRIA_NR,width = 2, pad = "0",),"_",WRIA_NM) |> factor()) |>
+  select(WRIA_NR, WRIA_NM, wria, acres = WRIA_AREA_ACR_QT) |> arrange(wria) |> 
+  sf::st_transform(sf::st_crs(epsg))
+```
+
 ```{r build_rde_wria_library, include=FALSE, eval=FALSE}
 # created 4/23/25 after API first exposed
 # see rde_wrias_init.qmd for scraping calls, not yet rerun to check any issues from baseurl changes
@@ -459,7 +466,7 @@ rde |>
 
 ```
 
-## HRCD tree loss
+## HRCD tree loss *Broken off to separate rde_SWIFD_HRCD*
 
 Reach table does not include "impervious increase", but also does not distinguish change agents and cannot differentiate, for example, "forestry" from "development"
 
@@ -621,7 +628,7 @@ rde |>
 
 
 ##tree loss change in W WA salmon reaches, ignoring 303d
-rde_anth_wria_any <- rde |>
+rde_anth_wria_swifd_any <- rde |>
   summarise(
     across(
       c(riparian_ac, all_tree_cover_ac, 
@@ -632,7 +639,7 @@ rde_anth_wria_any <- rde |>
   )
 
 # # #back to scale display problem: larger abs losses in notsalmon
-# rde_anth_wria_any |> 
+# rde_anth_wria_swifd_any |> 
 #   filter(as.integer(as.character(wria)) < 26) |>
 #   mutate(anth_pct = anth_chg_ac_sum / riparian_ac_sum) |>
 #   ggplot(aes(y = wria)) +
@@ -644,7 +651,7 @@ rde_anth_wria_any <- rde |>
 
 #this is good for seeing across wrias within each T/F and acres-fill-color cols
 #but still hard to see diffs in ratios
-rde_anth_wria_any |> 
+rde_anth_wria_swifd_any |> 
   filter(as.integer(as.character(wria)) < 26) |>
   pivot_longer(cols = ends_with("sum")) |> #pull(name) |> unique() |> sort()
   mutate(
@@ -662,7 +669,7 @@ rde_anth_wria_any |>
 
 
 
-# rde_anth_wria_any |> 
+# rde_anth_wria_swifd_any |> 
 #   filter(as.integer(as.character(wria)) < 26) |>
 #   mutate(swifd_any = if_else(swifd_any, "salmon","not salmon")) |> 
 #   pivot_longer(ends_with("sum")) |> 
@@ -693,7 +700,7 @@ rde |>
 #orange points below green suggest tree losses were distributed outside of salmon-reaches, whereas orange above green suggests tree losses were more associated with the salmon-extent
 #both of these relationships can occur above, below, or across the 1:1 line; for example, the area of salmon/SWIFD reaches in WRIA 12 was ~36% of the total riparian area, but these reaches were associated with ~44% of the tree cover (above 1:1), yet ~24% of tree loss area (below 1:1)
 
-rde_anth_wria_any |> 
+rde_anth_wria_swifd_any |> 
   filter(as.integer(as.character(wria)) < 26) |>
   mutate(
     across(ends_with("sum"), list(pct = ~./sum(.))),
@@ -723,7 +730,7 @@ ggplot() +
   labs(
     title = "Proportions of total tree cover and tree loss\nfor reaches with salmon use (SWIFD) in W WA WRIAs",
     subtitle = "Points sized by relative area",
-    x = "Salmon/SWIDF proportion of total riparian acres",
+    x = "Salmon/SWIFD proportion of total WRIA riparian acres",
     y = "Prop. of total riparian tree cover acres (green) or tree loss (orange) acres"
   ) +
   annotate("segment", x = 0.05, y = -0.01, xend = 0.5, yend = -0.01, arrow = arrow()) +
@@ -742,7 +749,7 @@ ggplot() +
 
 #strange plot, probably not a keeper
 ##tree acres per riparian acres, relative to any-SWIFD extent
-rde_anth_wria_any |>
+rde_anth_wria_swifd_any |>
   filter(as.integer(as.character(wria)) < 26) |>
   mutate(
     swifd_any = if_else(swifd_any, "salmon","not salmon"),
@@ -769,7 +776,7 @@ rde_anth_wria_any |>
 #another (earlier) version - visually simpler but also hard to capture/show multiple among strata relationships
 #larger 'not salmon' bars indicate reaches outside SWIFD have higher total proportion of tree cover
 #this shows bar-diffs clearly but is tricky since very different abs acres between bars (within and among wrias)
-rde_anth_wria_any |>
+rde_anth_wria_swifd_any |>
   filter(as.integer(as.character(wria)) < 26) |>
   mutate(
     swifd_any = if_else(swifd_any, "salmon","not salmon"),
@@ -782,7 +789,7 @@ rde_anth_wria_any |>
   labs(x = "total (tree ac / riparian ac)", y = NULL) +
   theme(legend.position = "top")
 #same but showing abs acres as bar width
-rde_anth_wria_any |> 
+rde_anth_wria_swifd_any |> 
   filter(as.integer(as.character(wria)) < 26) |>
   mutate(
     swifd_any = if_else(swifd_any, "salmon","not salmon"),
@@ -797,7 +804,7 @@ rde_anth_wria_any |>
   theme(legend.position = "top", axis.text.y = element_blank())
 
 #as above, showing between-SWIFD diffs but obscuring diffs in abs areas
-rde_anth_wria_any |> 
+rde_anth_wria_swifd_any |> 
   filter(as.integer(as.character(wria)) < 26) |>
   mutate(
     swifd_any = if_else(swifd_any, "salmon","not salmon"),
@@ -810,7 +817,7 @@ rde_anth_wria_any |>
   labs(x = "total (tree loss ac / tree ac)", y = NULL) +
   theme(legend.position = "top")
 #with acreage-varied widths
-rde_anth_wria_any |> 
+rde_anth_wria_swifd_any |> 
   filter(as.integer(as.character(wria)) < 26) |>
   mutate(
     swifd_any = if_else(swifd_any, "salmon","not salmon"),
@@ -827,7 +834,7 @@ rde_anth_wria_any |>
 
 
 #tabulating numbers to stare at
-rde_anth_wria_any |> 
+rde_anth_wria_swifd_any |> 
   filter(as.integer(as.character(wria)) < 26) |>
   mutate(
     swifd_any = if_else(swifd_any, "salmon","not salmon"),
@@ -843,6 +850,59 @@ rde_anth_wria_any |>
 
 ```
 
+```{r}
+#parallel coord as better version of x-y arrow segments
+#no UGA in this version of reach_table, otherwise would be good strat
+#cols answer:
+#how much of total RMZ extent is associated with salmon?
+#how much of total RMZ tree cover is associated with salmon?
+#how much of total RMZ tree loss is associated with salmon?
+d <- rde_anth_wria_swifd_any |> 
+  filter(as.integer(as.character(wria)) < 26) |>
+  mutate(
+    across(ends_with("sum"), list(pct = ~./sum(.))),
+    .by = wria
+  ) |> 
+  #filter(wria %in% c("4","6","8","12")) |> arrange(wria, swifd_any)
+  filter(swifd_any) |> 
+  #select(wria, swifd_any, ends_with("pct")) |> 
+  pivot_longer(-c(wria, swifd_any)) |> 
+  mutate(
+    var = str_sub(name, -3, -1),
+    name = str_remove(name, "_sum") |> str_remove("_pct")
+    ) |> 
+  pivot_wider(names_from = var, values_from = value) |> 
+  #pull(name) |> unique() |> sort()
+  mutate(name = factor(name, levels = sort(unique(name))[c(3,1,2)]))
+
+{
+d |> 
+  ggplot(aes(name, pct, group = wria)) +
+  geom_line(linewidth = 0.3) +
+  geom_point(aes(color = name, size = sum)) + 
+  geom_text(aes(label = wria),
+            #position = position_dodge(width = 0.5)
+            nudge_x = -0.05
+            ) +
+  scale_color_manual(values = c("tan","darkgreen","orange"), guide = "none") +
+  scale_size_area(guide = "none") +
+  #facet_wrap(~swifd_any, ncol = 2) +
+  labs(x = NULL, y = "Proportion", 
+       title = "SWIFD/salmon RMZ area as proportion of WRIA total")
+}+{
+sf_wrias |> 
+  mutate(WRIA_NR = factor(WRIA_NR)) |> 
+  left_join(d, by = c("WRIA_NR" = "wria")) |> 
+  drop_na(pct) |> 
+  #filter(str_detect(name, "anth")) |> 
+  ggplot() + geom_sf(aes(fill = name, alpha = pct), color = "grey80", linewidth = 0.1) + 
+  scale_fill_manual(values = c("tan","darkgreen","orange"), aesthetics = c("fill","color"), guide = "none") +
+  scale_alpha(name = "Prop.", guide = "none") +
+  facet_wrap(~name) #+ theme(legend.position = "bottom")
+}+
+  plot_layout(ncol = 1)
+
+```
 
 
 # Multi-WRIA multi-attribute filter
@@ -1257,13 +1317,6 @@ rde_st |>
        title = "Relative proportion of salmon occupied RMZ by temperature impairment status",
        subtitle = "Darker green indicates higher average tree cover")
 
-```
-
-```{r sf_wrias, include=FALSE, eval=FALSE}
-sf_wrias <- sf::read_sf(file.path(dir_data_common, "WR_WAT_WRIA.gdb/")) |>
-  mutate(wria = paste0(str_pad(WRIA_NR,width = 2, pad = "0",),"_",WRIA_NM) |> factor()) |>
-  select(WRIA_NR, WRIA_NM, wria, acres = WRIA_AREA_ACR_QT) |> arrange(wria) |> 
-  sf::st_transform(sf::st_crs(epsg))
 ```
 
 ```{r gdb_tesselation_polygons, include=FALSE, eval=FALSE}
