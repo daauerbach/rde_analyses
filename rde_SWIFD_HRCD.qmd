@@ -378,4 +378,150 @@ sf_tess_01_25_rmz_cntrd_pts |>
 
 ::: {.content-hidden when-format="html"}
 
+```{r streamcat_nlcd_imerv_etc}
+##from trap_attr.qmd which also has association of broader streamcat attrib to point location
+##imperv only, cat/ws-wide NOT riparian
+#read_csv(file.path(dir_data_common,"streamcat/ImperviousSurfaces_WA.csv")) |> 
+# select(COMID, WsAreaSqKm, paste0("PctImp",c(2001,2004,2006,2008,2011,2013,2016,2019),"Ws"))
+
+## recall riparian buffers are 100m, per https://www.epa.gov/national-aquatic-resource-surveys/streamcat-dataset-readme 
+## older flow_trees_heat.qmd has initial extensive EDA and object creation
+## then  flow_trees_apps.qmd has creation of riparian-only 'sc_wa_nlcd/sc_wa_nlcd_rp100.rds' (copied into hpas_ugas_hrcd.qmd)
+## also differencing of 2019-2011 composite imperv and tree
+## older saved rds has 2011,2013,2016,2019 WsRp100 and CatRp100: sc_wa_nlcd <- readRDS(file.path(dir_data_common, "streamcat", "sc_wa_nlcd_rp100.rds"))
+
+## not up on github anywhere, so repeating a slightly modified version here for reference
+
+# # list of 8 NLCD for all WA, 57313 rows/comids by (16categories x 2aoi cols)
+# sc_wa_nlcd_rp100 <- map(
+#   set_names(c(2001, 2004, 2006, 2008, 2011, 2013, 2016, 2019))
+#   ,
+#   ~StreamCatTools::sc_nlcd(
+#     state = "WA", year = .x,
+#     aoi = 'catrp100,wsrp100'
+#   ) |>
+#     rename_with(tolower) |> as_tibble() |>
+#     mutate(comid = as.character(comid), nlcd_year = .x)
+# )
+# saveRDS(sc_wa_nlcd_rp100, file.path(dir_data_common, "streamcat", "sc_wa_nlcd_rp100.rds"))
+
+sc_wa_nlcd_rp100 <- readRDS(file.path(dir_data_common, "streamcat", "sc_wa_nlcd_rp100.rds"))
+#wrangle to single tibble: 
+#strip year from colnames, focus on urban 'high'+'medium', 4 tree categories 
+sc_wa_nlcd_rp100 <- map(
+  sc_wa_nlcd_rp100,
+  ~.x |> 
+    rename_with(~str_remove(.,paste(names(sc_wa_nlcd_rp100),collapse = "|")) |> 
+                  str_remove("pct")) |> 
+    select(comid, nlcd_year,
+           contains("urbmd"), contains("urbhi"), 
+           contains("wdwet"), contains("mxfst"), contains("decid"), contains("conif")
+      ) |> 
+    mutate(
+      urbrp100_cat = urbmdcatrp100 + urbhicatrp100,
+      urbrp100_ws = urbmdwsrp100 + urbhiwsrp100,
+      treerp100_cat = wdwetcatrp100 + mxfstcatrp100 + decidcatrp100 + conifcatrp100,
+      treerp100_ws = wdwetwsrp100 + mxfstwsrp100 + decidwsrp100 + conifwsrp100
+    ) |> 
+    select(comid, nlcd_year, ends_with("_cat"), ends_with("_ws"))
+  ) |> 
+  list_rbind() |>
+  pivot_longer(cols = -c(comid, nlcd_year), values_to = "pct") |> 
+  separate(name, c("lc", "aoi")) |> 
+  mutate(pct = round(pct/100, 4))
+
+
+sf_flw <- readRDS("~/T/DFW-Team WDFW Watershed Synthesis - flow_trees_heat/sf_nhdp_wa_flw.rds") |>
+  sf::st_zm() |> 
+  rename_with(tolower) |> 
+  mutate(comid = as.character(comid))
+#duplicates a few linestrings that cross wrias (from 57229 to 57517)
+sf_flw <- sf_flw |> st_join(sf_wrias |> select(wria, wria_nr_nm)) 
+#sf_flw |> filter(wria %in% factor(1:25)) |> ggplot() + geom_sf(aes(color = wria_nr_nm))  
+
+#catchment polys
+sf_nhdp_wa <- readRDS("~/T/DFW-Team WDFW Watershed Synthesis - flow_trees_heat/sf_nhdp_wa.rds") |> 
+  select(comid, areasqkm)
+
+#add local catchment area and riparian cover pcts to W WA flowlines (duplicated by NLCD year and AOI)
+sf_flw_sc_wa_nlcd_rp100_wwa <- sf_flw |> 
+  filter(wria %in% factor(1:25)) |> 
+  select(-fcode) |> 
+  distinct(comid, .keep_all = T) |>  #drop from 17377 to 17342
+  inner_join(
+    as_tibble(sf_nhdp_wa) |> select(-geometry)
+    , by = "comid"
+  ) |> 
+  inner_join(sc_wa_nlcd_rp100, by = "comid")
+
+
+sf_flw_sc_wa_nlcd_rp100_wwa |> 
+  as_tibble() |> 
+  filter(aoi == "cat", lc == "urbrp100") |> 
+  mutate(nlcd_year = factor(nlcd_year)) |> 
+  ggplot(aes(nlcd_year, pct, group = comid)) +
+  #geom_point(aes(size = lengthkm), alpha = 0.5) + 
+  geom_line(linewidth = 0.1) +
+  scale_size_area(max_size = 3) +
+  guides(color = guide_none()) +
+  facet_wrap(~wria + lc, labeller = label_wrap_gen(multi_line = F)) +
+  labs(
+    title = "Proportion NLCD urban medium+high in NHDplus 100m riparian buffer",
+    subtitle = "Local catchment ",
+    y = "Pct. local catchment NLCD",
+  )
+
+
+tree_dtot <- sf_flw_sc_wa_nlcd_rp100_wwa |> 
+  as_tibble() |> 
+  filter(aoi == "cat", lc == "treerp100") |> 
+  arrange(nlcd_year) |> 
+  mutate(d = c(NA, diff(pct)), .by = comid) |> 
+  summarise(
+    dtot = sum(d, na.rm = T),
+    .by = c(comid, wria, lc, aoi, lengthkm)
+  )
+
+#interesting but potentially misleading/misinterpretable
+tree_dtot |> 
+  filter(abs(dtot)>0) |> 
+  ggplot() + 
+  #ggridges::geom_ridgeline(aes(lengthkm, wria, height = dtot))
+  ggridges::geom_density_ridges(aes(dtot, wria)) +
+  geom_vline(xintercept = 0, linetype = 2, linewidth = 0.5)
+
+sf_flw_sc_wa_nlcd_rp100_wwa |> 
+  as_tibble() |> 
+  filter(aoi == "cat", lc == "treerp100") |> 
+  mutate(nlcd_year = factor(nlcd_year)) |> 
+  inner_join(
+    tree_dtot |> filter(abs(dtot)>0) |> select(comid, dtot) |> mutate(dtot_lgl = dtot > 0)
+    , by = "comid"
+  ) |> 
+  ggplot(aes(nlcd_year, pct, group = comid, color = dtot_lgl)) +
+  #geom_point(aes(size = lengthkm), alpha = 0.5) + 
+  geom_line(linewidth = 0.2) +
+  scale_size_area(max_size = 3) +
+  scale_color_manual(values = c("orange","darkgreen")) +
+  guides(color = guide_none()) +
+  facet_wrap(~wria + lc, labeller = label_wrap_gen(multi_line = F)) +
+  labs(
+    title = "Proportion NLCD tree/forest in NHDplus 100m riparian buffer",
+    subtitle = "Local catchment ",
+    y = "Pct. local catchment NLCD",
+  )
+
+tree_dtot |> 
+  filter(abs(dtot)>0) |> 
+  mutate(dtot_lgl = dtot > 0) |> 
+  ggplot() +
+  geom_point(aes(dtot, lengthkm, color = dtot_lgl), alpha = 0.5) +
+  scale_color_manual(values = c("orange","darkgreen")) +
+  scale_y_log10() +
+  guides(color = guide_none()) +
+  facet_wrap(~wria, ncol = 1, scales = "free_y", strip.position = "right")
+
+```
+
+
 :::
