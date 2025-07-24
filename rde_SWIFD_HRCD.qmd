@@ -591,6 +591,7 @@ sc_nlcd_cat_ac_year_wria |>
 #appears preferable to spatially-focus on comids with a change of interest
 #then examine change in other classes
 
+#"how well is washington's land use regulatory regime working to direct loss of natural cover away from a riparian corridor?"
 
 #starting object with cat and catrp100
 sc_nlcd_cat <- readRDS(file.path(dir_data_common, "streamcat", "sc_wa_nlcd.rds")) |> 
@@ -605,41 +606,48 @@ sc_nlcd_cat <- readRDS(file.path(dir_data_common, "streamcat", "sc_wa_nlcd.rds")
     as_tibble(sf_cat) |> select(comid, wria, wria_nr_nm), by = "comid"
   )
 
-#treed riparian area
-#what about 'wdwet'?
-sc_nlcd_cat_tree <- sc_nlcd_cat |> 
+#treed riparian area: what about 'wdwet'?
+#urblo and urbop are doing different things
+sc_nlcd_cat_ac <- sc_nlcd_cat |> 
+  #filter(is.na(urbmdcatrp100)) |> distinct(comid)
+  drop_na(urbmdcatrp100) |> #single lu class captures all 231 comids NA for rp100 vals
   mutate(
     across(c(ends_with("cat"), ends_with("catrp100")), ~./100)
     ,
     tree_cat = conifcat + decidcat + mxfstcat,
     tree_catrp100 = conifcatrp100 + decidcatrp100 + mxfstcatrp100,
     
-    tree_cat_ac = tree_cat * catareasqkm * 247.11,
-    tree_catrp100_ac = tree_catrp100 * catareasqkm * 247.11
+    urb_cat = urbhicat + urbmdcat,
+    urb_catrp100 = urbhicatrp100 + urbmdcatrp100,
+
+    across(ends_with("cat"), list(ac = ~.* catareasqkm * 247.11)),
+    across(ends_with("catrp100"), list(ac = ~.* catareasqkmrp100 * 247.11))
     ) 
 
-#ignoring years
-sc_nlcd_cat_tree |> 
+### pct-based viz
+#ignoring years, per-wria distrib pct-tree
+sc_nlcd_cat_ac |> 
   ggplot() + geom_boxplot(aes(tree_cat, fct_reorder(wria, tree_cat)), varwidth = T)
-#ignoring years, contrasting rp100 wria-wide
-sc_nlcd_cat_tree |> 
+#ignoring years, contrasting rp100 vs wria-wide
+sc_nlcd_cat_ac |> 
   select(comid, nlcd_year, wria, tree_cat, tree_catrp100) |> 
   pivot_longer(cols = contains("tree"), values_to = "pct") |> 
   ggplot() + geom_boxplot(aes(pct, fct_reorder(wria, pct), color = name), varwidth = T)
-#ignoring years, riparian-vs-whole per-local diff
+#ignoring years, per-wria distrib of per-local spatial diff riparian-vs-whole
 #positive: %treed in riparian corr greater than local catch as whole
 #but these distributions of differences ignore 'starting point' of higher/lower pcts
-sc_nlcd_cat_tree |> 
+sc_nlcd_cat_ac |> 
   select(comid, nlcd_year, wria, tree_cat, tree_catrp100) |> 
   mutate(d_tree = tree_catrp100 - tree_cat) |> 
   ggplot() + geom_boxplot(aes(d_tree, fct_reorder(wria, d_tree)), varwidth = T)
 #so ordinate diffs by riparian treed
 #within each nlcd_year, d_tree>0 indicates locally 'relatively-more-treed-than-overall' riparian for a given level of %treed
 #larger d_tree at larger tree_catrp suggests more 'green ribbon'-like conditions with untreed upland
-sc_nlcd_cat_tree |> 
+sc_nlcd_cat_ac_dtree <- sc_nlcd_cat_ac |> 
   filter(nlcd_year %in% c(2001, 2019)) |> 
   select(comid, nlcd_year, wria, tree_cat, tree_catrp100) |> 
-  mutate(d_tree = tree_catrp100 - tree_cat) |> 
+  mutate(d_tree = tree_catrp100 - tree_cat) 
+sc_nlcd_cat_ac_dtree |> 
   ggplot() + geom_point(aes(tree_catrp100, d_tree, color = factor(nlcd_year)), alpha = 0.1, size = 0.2) +
   annotate("segment", x = 0.05, y = -1.05, xend = 0.95, yend = -1.05, arrow = arrow()) +
   annotate("text", x = 0.15, y = -1, label = "higher riparian %tree cover", hjust = 0) +
@@ -647,31 +655,22 @@ sc_nlcd_cat_tree |>
   annotate("text", x = -0.01, y = 0.5, label = "greater difference \nriparian vs whole-cat %tree cover", hjust = 0) +
   wacolors::scale_color_wa_d() +
   facet_wrap(~nlcd_year)
-#difficult to intuit...
+#following is difficult to intuit...
 #calc'd as temporal diff in spatial diff: (rip19-cat19) - (rip01-cat01)
 # best-case? positive d19 is more positive than a negative or positive d01?
-sc_nlcd_cat_tree |> 
-  filter(nlcd_year %in% c(2001, 2019)) |> 
-  select(comid, nlcd_year, wria, tree_cat, tree_catrp100) |> 
-  mutate(d_tree = tree_catrp100 - tree_cat) |> 
+sc_nlcd_cat_ac_dtree |> 
   pivot_wider(names_from = nlcd_year, values_from = contains("tree")) |> 
   mutate(`d_tree_2019-2001` = d_tree_2019 - d_tree_2001) |> 
   ggplot() +
   geom_point(aes(d_tree_2019, `d_tree_2019-2001`, size = tree_catrp100_2019, color = wria), alpha = 0.1, show.legend = F) +
   scale_size_area()
 #spatial-diff ordinated t2 vs t1
-sc_nlcd_cat_tree |> 
-  filter(nlcd_year %in% c(2001, 2019)) |> 
-  select(comid, nlcd_year, wria, tree_cat, tree_catrp100) |> 
-  mutate(d_tree = tree_catrp100 - tree_cat) |> 
+sc_nlcd_cat_ac_dtree |> 
   pivot_wider(names_from = nlcd_year, values_from = contains("tree")) |> 
   ggplot() +
   geom_point(aes(d_tree_2001, d_tree_2019, size = tree_catrp100_2019, color = wria), alpha = 0.2, show.legend = F)
 #best of a dubious bunch? calc then ordinate each temporal diff per spatial-extent
-sc_nlcd_cat_tree |> 
-  filter(nlcd_year %in% c(2001, 2019)) |> 
-  select(comid, nlcd_year, wria, tree_cat, tree_catrp100) |> 
-  mutate(d_tree = tree_catrp100 - tree_cat) |> 
+sc_nlcd_cat_ac_dtree |> 
   pivot_wider(names_from = nlcd_year, values_from = contains("tree")) |> 
   mutate(
     d_cat_1901 = tree_cat_2019 - tree_cat_2001,
@@ -684,17 +683,326 @@ sc_nlcd_cat_tree |>
   annotate("segment", x = -1.05, y = -1, xend = -1.05, yend = 1, arrow = arrow()) +
   annotate("text", x = -1, y = 0.85, label = "greater riparian %tree cover in 2019 vs 2001", hjust = 0)
 
- 
+#urban flipside, sort of interesting to see in the same 'unit space'?
+#but still visually compromised by not having 'starting point' in the picture
+#such that +5% between years means very different things from 75% vs 0%
+sc_nlcd_cat_ac |> 
+  filter(nlcd_year %in% c(2001, 2019)) |> 
+  select(comid, nlcd_year, wria, urb_cat, urb_catrp100) |> 
+  pivot_wider(names_from = nlcd_year, values_from = contains("urb")) |> 
+  mutate(
+    d_cat_1901 = urb_cat_2019 - urb_cat_2001,
+    d_catrp100_1901 = urb_catrp100_2019 - urb_catrp100_2001
+  ) |> 
+  ggplot() +
+  geom_point(aes(d_cat_1901, d_catrp100_1901, size = urb_catrp100_2019, color = wria), alpha = 0.2, show.legend = F) +
+    annotate("segment", x = -1, y = -1.05, xend = 1, yend = -1.05, arrow = arrow()) +
+  annotate("text", x = 0, y = -.95, label = "greater whole local catchment\n %urban in 2019 vs 2001", hjust = 0) +
+  annotate("segment", x = -1.05, y = -1, xend = -1.05, yend = 1, arrow = arrow()) +
+  annotate("text", x = -1, y = 0.85, label = "greater riparian %urban cover in 2019 vs 2001", hjust = 0)
 
+#better. 
+#steeper/more vertical indicates greater riparian increase than encompassing
+#versus flatter for surrounding increases without riparian
+wrias <- as.character(c(1,7,8,10,15, 28,32,37,45,57))
+{
+sc_nlcd_cat_ac |> 
+  filter(nlcd_year %in% c(2001, 2019)) |> 
+  select(comid, nlcd_year, wria, wria_nr_nm,
+         starts_with("urb_") #urb_cat, urb_catrp100
+         ) |> 
+  #pivot_longer(-c(wria, comid, nlcd_year)) |> 
+  #pivot_wider(names_from = nlcd_year, names_prefix = "nlcd_", values_from = value)
+  pivot_wider(names_from = nlcd_year, values_from = contains("cat")) |>
+    mutate(
+      d_cat = urb_cat_2019 - urb_cat_2001,
+      d_catrp100 = urb_catrp100_2019 - urb_catrp100_2001
+    ) |> 
+  filter(wria %in% wrias) |> 
+  ggplot() + 
+    geom_segment(aes(
+      x = urb_cat_2001, y = urb_catrp100_2001,
+      xend = urb_cat_2019, yend = urb_catrp100_2019,
+      color = d_cat - d_catrp100 #color = d_cat > d_catrp100 #color = wria
+      ),
+      arrow = arrow(length = unit(0.05,"npc")),
+      show.legend = T) +
+  geom_abline(slope = 1, intercept = 0, linetype = 3) +
+    wacolors::scale_color_wa_c("lopez", midpoint = 0) +
+  scale_x_continuous(labels = scales::percent) +
+  scale_y_continuous(labels = scales::percent) +
+  #facet_wrap(~wria_nr_nm, nrow = 2) +
+    facet_wrap(~wria_nr_nm, ncol = 1, strip.position = "right") +
+  theme(strip.text = element_text(size = 5), legend.position = "top") +
+  labs(
+    title = "2001 to 2019 urban cover change",
+    subtitle = "StreamCat NLCD %urban high+medium",
+    x = "whole local catchment",
+    y = "100m riparian corridor %urban"
+  )
+}+{
+sc_nlcd_cat_ac |> 
+  filter(nlcd_year %in% c(2001, 2019)) |> 
+  select(comid, nlcd_year, wria, wria_nr_nm,
+         starts_with("tree_")) |> 
+  pivot_wider(names_from = nlcd_year, values_from = contains("cat")) |>
+    mutate(
+      d_cat = tree_cat_2019 - tree_cat_2001,
+      d_catrp100 = tree_catrp100_2019 - tree_catrp100_2001
+      , 
+      d_catrp100f = case_when(
+        # d_catrp100 < 0 ~ "<0",
+        # d_catrp100 == 0 ~ "=0",
+        # d_catrp100 > 0 ~ ">0"
+        d_catrp100 < 0 & d_cat < 0 ~ "both dec",
+        d_catrp100 >= 0 & d_cat >= 0 ~ "both inc",
+        d_catrp100 < 0 & d_cat >= 0 ~ "rp100 dec",
+        d_catrp100 >= 0 & d_cat < 0 ~ "cat dec"
+      )
+    ) |> 
+  filter(wria %in% wrias) |> 
+  ggplot() + 
+    geom_segment(aes(
+      x = tree_cat_2001, y = tree_catrp100_2001,
+      xend = tree_cat_2019, yend = tree_catrp100_2019,
+      color = d_catrp100 #color = wria
+      ),
+      arrow = arrow(length = unit(0.05,"npc")),
+      show.legend = T) +
+  geom_abline(slope = 1, intercept = 0, linetype = 3) +
+        wacolors::scale_color_wa_c("stuart", midpoint = 0) +
+  scale_x_continuous(labels = scales::percent) +
+  scale_y_continuous(labels = scales::percent) +
+  #facet_wrap(~wria_nr_nm, nrow = 2) +
+  # facet_wrap(~wria_nr_nm, ncol = 1, strip.position = "right") +
+  facet_wrap(~wria_nr_nm+d_catrp100f, ncol = 4, 
+             labeller = label_wrap_gen(multi_line = F),
+             strip.position = "right") +
+  theme(strip.text = element_text(size = 5), legend.position = "top") +
+  labs(
+    title = "2001 to 2019 tree cover change",
+    subtitle = "StreamCat NLCD %confi+decid+mxfst",
+    x = "whole local catchment",
+    y = "100m riparian corridor %tree"
+  )
+} + 
+  plot_layout(widths = c(1,4)/5,guides = "keep")
 
-#starting to re-demo concept, redoing '+urbancat+treerp100'
+#above is interesting but still not focusing the tree change on only those comids with +urban
 #comids with non-zero urban cover in final NLCD year
 #could threshold to larger %
-comid_2019_urb <- sc_nlcd_cat |> 
+comid_2019_urb <- sc_nlcd_cat_ac |> 
   #ggplot() + stat_ecdf(aes(urbmdcat + urbhicat, color = factor(nlcd_year)))
   #summarise(q = quantile(urbmdcat + urbhicat, p = 0.75), .by = nlcd_year)
   filter(nlcd_year == 2019, (urbmdcat + urbhicat > 0)) |> 
   pull(comid)
+
+{
+  sc_nlcd_cat_ac |> 
+    filter(nlcd_year %in% c(2001, 2019), comid %in% comid_2019_urb) |> 
+    select(comid, nlcd_year, wria, wria_nr_nm,
+           starts_with("urb_")) |> 
+    pivot_wider(names_from = nlcd_year, values_from = contains("cat")) |>
+    mutate(
+      d_cat = urb_cat_2019 - urb_cat_2001,
+      d_catrp100 = urb_catrp100_2019 - urb_catrp100_2001
+    ) |> 
+    filter(wria %in% wrias) |> 
+    ggplot() + 
+    geom_segment(aes(
+      x = urb_cat_2001, y = urb_catrp100_2001,
+      xend = urb_cat_2019, yend = urb_catrp100_2019,
+      color = d_cat - d_catrp100 
+    ),
+    arrow = arrow(length = unit(0.05,"npc")),
+    show.legend = T) +
+    geom_abline(slope = 1, intercept = 0, linetype = 3) +
+    wacolors::scale_color_wa_c("lopez", midpoint = 0) +
+    scale_x_continuous(labels = scales::percent) +
+    scale_y_continuous(labels = scales::percent) +
+    facet_wrap(~wria_nr_nm, ncol = 1, strip.position = "right") +
+    theme(strip.text = element_text(size = 5), legend.position = "top") +
+    labs(
+      title = "2001 to 2019 urban cover change",
+      subtitle = "StreamCat NLCD %urban high+medium",
+      x = "whole local catchment",
+      y = "100m riparian corridor %urban"
+    )
+}+{
+  sc_nlcd_cat_ac |> 
+    filter(nlcd_year %in% c(2001, 2019), comid %in% comid_2019_urb) |> 
+    select(comid, nlcd_year, wria, wria_nr_nm,
+           starts_with("tree_")) |> 
+    pivot_wider(names_from = nlcd_year, values_from = contains("cat")) |>
+    mutate(
+      d_cat = tree_cat_2019 - tree_cat_2001,
+      d_catrp100 = tree_catrp100_2019 - tree_catrp100_2001
+      , 
+      d_catrp100f = case_when(
+        d_catrp100 < 0 & d_cat < 0 ~ "both dec",
+        d_catrp100 >= 0 & d_cat >= 0 ~ "both inc",
+        d_catrp100 < 0 & d_cat >= 0 ~ "rp100 dec",
+        d_catrp100 >= 0 & d_cat < 0 ~ "cat dec"
+      )
+    ) |>
+    filter(wria %in% wrias) |> 
+    #filter(d_catrp100f=="rp100 dec") |> summarise(across(contains("ac_"), sum), .by = wria_nr_nm)
+    summarise(across(contains("ac_"), sum), .by = c(d_catrp100f, wria_nr_nm)) |> 
+    mutate(
+      d_cat_ac = tree_cat_ac_2019 - tree_cat_ac_2001,
+      d_catrp100_ac = tree_catrp100_ac_2019 - tree_catrp100_ac_2001
+    ) |> 
+    select(wria_nr_nm, d_catrp100f, contains("cat_"), contains("catrp100_")) |> 
+    arrange(wria_nr_nm, d_catrp100f) |> 
+    gt(groupname_col = "wria_nr_nm", rowname_col = "d_catrp100f") |> fmt_number(decimals = 0) |> 
+    tab_style_body(fn = \(x){x<0}, style = cell_text(color = "red"))
+  ggplot() + 
+    geom_segment(aes(
+      x = tree_cat_2001, y = tree_catrp100_2001,
+      xend = tree_cat_2019, yend = tree_catrp100_2019,
+      color = d_catrp100
+    ),
+    arrow = arrow(length = unit(0.05,"npc")),
+    show.legend = T) +
+    geom_abline(slope = 1, intercept = 0, linetype = 3) +
+    wacolors::scale_color_wa_c("stuart", midpoint = 0) +
+    scale_x_continuous(labels = scales::percent) +
+    scale_y_continuous(labels = scales::percent) +
+    facet_wrap(~wria_nr_nm+d_catrp100f, ncol = 4, 
+               labeller = label_wrap_gen(multi_line = F),
+               strip.position = "right") +
+    theme(strip.text = element_text(size = 5), legend.position = "top") +
+    labs(
+      title = "2001 to 2019 tree cover change",
+      subtitle = "StreamCat NLCD %confi+decid+mxfst; comids with urban > 0 in 2019",
+      x = "whole local catchment",
+      y = "100m riparian corridor %tree"
+    )
+} + 
+  plot_layout(widths = c(1,4)/5,guides = "keep")
+
+#increased riparian urban cover is not exclusively correlated with decreased tree cover
+sc_nlcd_cat_ac |> 
+  filter(
+    nlcd_year %in% c(2001, 2019)
+    , comid %in% comid_2019_urb
+    ) |> 
+  select(comid, nlcd_year, wria, wria_nr_nm,
+         starts_with("urb_") & ends_with("ac"),
+         starts_with("tree_") & ends_with("ac")
+         ) |> 
+  pivot_wider(names_from = nlcd_year, values_from = contains("cat")) |>
+  mutate(
+    d_cat_ac_urb = urb_cat_ac_2019 - urb_cat_ac_2001,
+    d_cat_ac_tree = tree_cat_ac_2019 - tree_cat_ac_2001,
+
+    d_catrp100_ac_urb = urb_catrp100_ac_2019 - urb_catrp100_ac_2001,
+    d_catrp100_ac_tree = tree_catrp100_ac_2019 - tree_catrp100_ac_2001
+  ) |> 
+  filter(wria %in% wrias) |> 
+  ggplot() +
+  geom_point(aes(d_catrp100_ac_urb, d_catrp100_ac_tree, color = wria), alpha = 0.5, size = 0.5, show.legend = F) +
+  geom_smooth(aes(d_catrp100_ac_urb, d_catrp100_ac_tree, color = wria), show.legend = F) +
+  geom_hline(yintercept = 0) +
+  facet_wrap(~wria, nrow = 2, scales = "free") +
+  labs(
+    title = "Increased riparian urban cover is not exclusively correlated with decreased tree cover",
+    subtitle = "StreamCat NLCD 2019-2001, comids with non-zero urban in 2019")
+
+#what changes where urban increases
+
+#focus first on locations with nonzero RP100 urban in 2019
+comid_2019_urb_rp100 <- sc_nlcd_cat_ac |> 
+  filter(nlcd_year == 2019, (urbmdcatrp100 + urbhicatrp100 > 0)) |> 
+  pull(comid)
+
+pal_nlcd <- c("brown","darkgreen","yellow","green","yellowgreen","yellow","seagreen","green","blue","tan","grey10","grey30","grey60","grey80","seagreen")
+
+sc_nlcd_cat_ac |> 
+  filter(
+    nlcd_year %in% c(2001, 2019)
+    ,
+    comid %in% comid_2019_urb_rp100
+    ) |> 
+  select(wria, wria_nr_nm, comid, nlcd_year, contains("rp100") & ends_with("_ac")) |> 
+  #filter(nlcd_year==2019) |> summary()
+  pivot_longer(-c(wria, wria_nr_nm, comid, nlcd_year), names_to = "nlcd_class") |> 
+  pivot_wider(names_from = nlcd_year,
+              #names_prefix = "nlcd_", 
+              values_from = value) |> 
+  mutate(d = `2019` - `2001`) |> #mutate(d = nlcd_2019 - nlcd_2001) |> 
+  # pivot_wider(names_from = name, values_from = c(d, `2019`, `2001`)) |> 
+  filter(
+    str_detect(nlcd_class, "urb_|tree_", negate = T),
+    `2001`+`2019` > 0 #drop classes with zero cover both year
+    ) |> 
+  #ignore classes with no change in comid
+  filter(abs(d) > 0) |> 
+  filter(wria == "15") |> 
+  # #big change comids
+  filter(abs(d) < 50) |> 
+  # #focal comids with larger urb gains
+  # filter(nlcd_class == "urbmdcatrp100_ac", d > 10) |> pull(comid) -> urbmdgain
+  ggplot() +
+  # # #quasi heatmap
+  # # geom_point(aes(fct_reorder(comid, d, min), nlcd_class, color = d)) +
+  # # scale_color_gradient2(midpoint = 0) +
+  # # scale_size_area(max_size = 4) +
+  # #rotated parallel coord
+  # geom_point(aes(nlcd_class, d, group = comid, color = nlcd_class), size = 0.6, show.legend = F) +
+  # geom_line(aes(nlcd_class, d, group = comid), linewidth = 0.1, alpha = 0.3) +
+  # coord_flip() +
+  #problem with 'avg' change per class is that it blends different comid-specific shifts?
+  geom_vline(xintercept = 0) +
+  geom_jitter(aes(d, nlcd_class, color = nlcd_class), size = 0.5, alpha = 0.5, show.legend = F) +
+  geom_boxplot(aes(d, nlcd_class, color = nlcd_class), fill = NA, varwidth = T, outliers = F, show.legend = F) +
+  scale_color_manual(values = pal_nlcd) +
+  facet_wrap(~wria, scales = "free_x") +
+  theme(panel.grid = element_blank()) 
+
+#closer look at 2 big rp100 changes, gain conif lose shrb
+x <- sf_cat |> filter(comid %in% c("23990429", "24288108"))
+y <- sf_flw |> filter(comid %in% c("23990429", "24288108")) |> st_buffer(dist = 300)
+mapview(x) + mapview(y) 
+#just E of Tahuya SF and E of Union R outlet, rp100 looks more S in cat, E of 'carney lake'
+#plainly some regrowth of cut patches between 2001 and 2019 for 24288108
+#and for 23990429, appears to be 
+#https://earthengine.google.com/timelapse#v=47.46993,-122.80657,11.104,latLng&t=3.53&ps=50&bt=19840101&et=20221231
+
+d <- sc_nlcd_cat_ac |> 
+  filter(comid %in% urbmdgain) |> 
+  select(wria, wria_nr_nm, comid, nlcd_year, contains("rp100") & ends_with("_ac")) |> 
+  pivot_longer(-c(wria, wria_nr_nm, comid, nlcd_year), names_to = "nlcd_class") |> 
+  filter(str_detect(nlcd_class, "ice|urb_|tree_", negate = T)) |> 
+  arrange(comid, nlcd_year, desc(nlcd_class))
+{d |> 
+  ggplot(aes(nlcd_year, value, color=nlcd_class, fill=nlcd_class, group = comid)) +
+  geom_col() +
+  scale_color_manual(values = pal_nlcd, aesthetics = c("color","fill")) +
+  facet_wrap(~comid, ncol = 1, scales = "free") + labs(y = "acres")
+}+{
+  d |> 
+  ggplot(aes(nlcd_year, value, color=nlcd_class, fill=nlcd_class, group = nlcd_class)) +
+  geom_line(show.legend = F) +
+  scale_color_manual(values = pal_nlcd, aesthetics = c("color","fill")) +
+  facet_wrap(~comid, ncol = 1, scales = "free") + labs(y = "acres")
+} + plot_layout(guides = "keep")
+
+#turns out to be N Bremerton, making the 'densification' plausible
+x <- sf_cat |> filter(comid %in% c("23989097"))
+y <- sf_flw |> filter(comid %in% c("23989097")) |> st_buffer(dist = 300)
+mapview(x) + mapview(y) 
+
+d |> 
+  filter(
+    nlcd_year %in% c(2001, 2019),
+    comid %in% c("23989097")
+    ) |> 
+  pivot_wider(names_from = nlcd_year, values_from = value) |> 
+  mutate(d = `2019` - `2001`) |> 
+  arrange(desc(d))
+
+#function to plot all-nlcd_class series, passed comid(s) as arg
 
 ```
 
