@@ -263,7 +263,8 @@ sc_nlcd_2001 |>
 
 ## Change since 2001
 
-Aggregating to statewide totals, the higher intensity urban cover classes increased within both local catchments and the `rp100` 100m riparian corridor. 
+*this is now deducting rp100_ac from cat_ac, but need to *
+Aggregating to statewide totals, the higher intensity urban cover classes ... within ... local catchments and the `rp100` 100m riparian corridor. 
 
 - abs areas smaller in rp100 but appear to be roughly similar rates, proportional to overall area; earlier simple bar plot was misleading due to abs-area y-axis scale, this view suggests no appreciably lower urb increase within rp100
 
@@ -282,7 +283,11 @@ sc_nlcd |>
     aoi = if_else(str_detect(name, "rp100"), "rp100", "cat"),
     nlcd_class = str_remove(name, "cat") |> str_remove("rp100") |> str_remove("_ac_sum"),
     name = NULL
-    ) |> 
+    ) |>
+  pivot_wider(names_from = aoi, values_from = ac) |> 
+  mutate(d_cat_rp100 = cat - rp100) |> 
+  pivot_longer(c(cat, rp100, d_cat_rp100), names_to = "aoi", values_to = "ac") |> 
+  filter(aoi != "cat") |> 
   #filter(nlcd_class=="urbhi", aoi =="rp100") -> d; lm(ac~nlcd_year, d) -> d; broom::tidy(d); rm(d)
   split(~nlcd_class) |> 
   map(
@@ -308,6 +313,7 @@ sc_nlcd |>
       scale_fill_manual(values = pal_nlcd[grep(unique(.x$nlcd_class), names(pal_nlcd))]) + 
       scale_y_continuous(labels = scales::comma) +
       facet_wrap(~aoi, ncol = 2, strip.position = "top", scales = "free") +
+      #facet_wrap(~aoi, ncol = 3, strip.position = "top", scales = "free") +
         labs(y = paste("acres", unique(.x$nlcd_class)), subtitle = unique(.x$nlcd_class)) +
       theme(strip.text = element_text(hjust = 0.1))
   ) |> 
@@ -333,7 +339,12 @@ sc_nlcd |>
     nlcd_class = str_remove(name, "cat") |> str_remove("rp100") |> str_remove("_ac_sum"),
     name = NULL
     ) |> 
+    pivot_wider(names_from = aoi, values_from = ac) |> 
+  mutate(d_cat_rp100 = cat - rp100) |> 
+  pivot_longer(c(cat, rp100, d_cat_rp100), names_to = "aoi", values_to = "ac") |> 
   arrange(wria, aoi, nlcd_year) |> 
+  filter(aoi != "cat") |> 
+
   #filter(nlcd_class=="urbhi", aoi =="rp100") -> d; lm(ac~nlcd_year, d) -> d; broom::tidy(d); rm(d)
   filter(wria %in% wrias) |> 
   filter(wria %in% c("1","57")) |> 
