@@ -110,9 +110,16 @@ Accordingly, these data are a standardized, consistent means to investigate larg
 # )
 # saveRDS(sc_wa_nlcd, file.path(dir_data_common, "streamcat", "sc_wa_nlcd.rds"))
 
+# #removing 7 massive cross-border COMIDs mostly in BC; 6 are >1000km2, last is >350km2
+# sf_cat |> arrange(desc(areasqkm)) |> filter(areasqkm>1000) |> ggplot() + geom_sf() + geom_sf_text(aes(label = comid))
+# sf_cat |> filter(between(areasqkm,100,1000)) |> ggplot() + geom_sf(aes(fill=areasqkm)) + geom_sf_text(aes(label = comid))
+# filter(sf_cat, comid =="23031682")->x; mapview::mapview(x)
+comids_drop_BC <- filter(as_tibble(sf_cat), areasqkm>1000) |> distinct(comid) |> bind_rows(tibble(comid = "23031682"))
+
 #starting object with cat and catrp100 (no Ws)
-#inner_join of sf_cat to add WRIA
-#dropping 231 comids with NA rp100
+#inner_join against sf_cat to add WRIA 
+#then second inner_join against sf_flw to get common set across all 3
+#dropping remaining comids with NA rp100
 #converting pcts to 0-1
 #appending 'ac[res]' cols as AOI-specific product of pct and areasqkm
 sc_nlcd <- readRDS(file.path(dir_data_common, "streamcat", "sc_wa_nlcd.rds")) |> 
@@ -127,7 +134,9 @@ sc_nlcd <- readRDS(file.path(dir_data_common, "streamcat", "sc_wa_nlcd.rds")) |>
              ends_with("cat"), ends_with("catrp100"))
       ) |> 
   list_rbind() |> 
+  anti_join(comids_drop_BC, by = "comid") |> 
   inner_join(as_tibble(sf_cat) |> select(comid, wria, wria_nr_nm), by = "comid") |> 
+  inner_join(as_tibble(sf_flw) |> distinct(comid), by = "comid") |> 
   drop_na(urbmdcatrp100) |> #single lu class captures all 231 comids NA for rp100 vals
   mutate(
     across(c(ends_with("cat"), ends_with("catrp100")), ~./100)
@@ -141,11 +150,22 @@ sc_nlcd <- readRDS(file.path(dir_data_common, "streamcat", "sc_wa_nlcd.rds")) |>
     across(ends_with("catrp100"), list(ac = ~.* catareasqkmrp100 * 247.11))
     )
 
-#going fast, just presumes nlcd_class sorted alphabetically
-pal_nlcd <- c("brown","darkgreen","yellow","green","yellowgreen",
-              "yellow","seagreen","white","green","blue",
-              "tan","grey10","grey30","grey60","grey80","seagreen")
+#bring both sf to same 56879
+sf_flw <- sf_flw |> inner_join(distinct(sc_nlcd, comid), by = "comid") 
+sf_cat <- sf_cat |> inner_join(distinct(sc_nlcd, comid), by = "comid")
 
+
+pal_nlcd <- set_names(
+  c("brown","darkgreen","yellow","lightgreen","yellowgreen",
+    "yellow","seagreen","white","green","blue",
+    "tan","grey10","grey60","grey30","grey80","seagreen")
+  ,
+  grep("catrp100_ac", names(sc_nlcd), value = T)[1:16] |> 
+    str_remove("catrp100_ac") |> sort()
+)
+
+#testing focal set
+wrias <- as.character(c(1,7,8,10,15, 28,32,37,45,57))
 
 ```
 
@@ -172,35 +192,46 @@ sc_nlcd_2001 |> filter(comid =="23989097")
 ```
 
 
-# A 2001 Baseline
+# Results and Discussion 
 
-```{r sc_nlcd_2001_sf_2001}
+## 2001 Baseline
+
+The spatial and proportional distributions of land cover classes in 2001 follow expectations, with more intense urban cover types concentrated in the western portion of the state, particularly in central Puget Sound, and isolated higher cover corresponding to Spokane, Yakima, and Vancouver. A sum of 'forest' cover types (conifer, deciduous, and mixed) captures the large areas of commercial, state, and national forest in the Olympics and Cascades as well as the eastern Blue Mountain and Colville regions.
+
+The conifer, shrub, crop, and grass classes make up the largest total areas, with the two lower intensity urban classes (`urbop` and `urblo`, at <20% impervious and <50% impervious respectively) each more extensive than the sum of the two higher intensity classes (`urbmd` and `urbhi`, at <80% and >80% impervious). The relative proportions of the total areas within each AOI are similar across most classes, but the herbaceous and wooded wetland types (`hbwet` and `wdwet`) are relatively more prevalent in the `rp100` riparian corridor, while the higher intensity urban types are slightly less so.
+
+```{r sc_nlcd_2001}
+#single year, all attrib both AOI
 sc_nlcd_2001 <- sc_nlcd |> 
   filter(nlcd_year==2001) 
-
-sf_flw_catrp100_2001 <- sf_flw |> 
-  inner_join(
-    select(sc_nlcd_2001, comid, ends_with("catrp100")),
-    by = "comid"
-  )
-sf_cat_cat_2001 <- sf_cat |> 
-  inner_join(
-    select(sc_nlcd_2001, comid, ends_with("cat")),
-    by = "comid"
-  )
 ```
 
-```{r statewide_area_overall}
-sc_nlcd_2001 |> 
-  summarise(across(contains("areasqkm"), sum)) |> 
-  pivot_longer(contains("areasqkm"), names_to = "aoi", values_to = "sqkm") |> 
-  mutate(
-    aoi = str_remove(aoi, "areasqkm"),
-    ac = sqkm * 247.11) |> 
-  gt() |> fmt_number(decimals = 0)
+```{r ggstatewide_urb_tree}
+{ 
+  inner_join(
+    sf_flw,
+    sc_nlcd_2001 |> select(comid, ends_with("catrp100")),
+    by = "comid"
+  ) |> 
+    ggplot() +
+    geom_sf(aes(color = urbmdcatrp100+urbhicatrp100)) +
+    scale_color_gradient(low = "lightblue", high = "grey20") +
+    labs(subtitle = "2001 medium + high intensity urban, rp100", color = "Urb% rp100") + theme_minimal()
+}+{
+  inner_join(
+    sf_cat,
+    sc_nlcd_2001 |> select(comid, ends_with("cat")),
+    by = "comid"
+  ) |> 
+    ggplot() +
+    geom_sf(aes(fill = conifcat+decidcat+mxfstcat), color = NA) +
+    scale_fill_gradient(low = "grey90", high = "darkgreen") +
+    labs(subtitle = "2001 conifer+deciduous+mixed forest, cat", color = "Tree% cat") + theme_minimal()
+} + plot_layout(ncol = 1)
+
 ```
 
-```{r statewide_area_cat_rp100}
+```{r gt_statewide_area_cat_rp100}
 sc_nlcd_2001 |> 
   select(comid, contains("_ac"), -contains("urb_")) |> 
   summarise(across(contains("_ac"), sum)) |> 
@@ -215,39 +246,285 @@ sc_nlcd_2001 |>
 #catareasqkm includes catareasqkmrp100
   mutate(
     rp100_pct_cat = rp100 / cat, 
-    across(c(cat, rp100), list(pct = ~./sum(.)))
+    across(c(cat, rp100), list(pct_tot = ~./sum(.)))
     ) |> 
   arrange(nlcd_class) |> 
-  gt() |> 
+  gt(caption = "2001 NLCD statewide total areas by LU class and AOI") |> 
   fmt_number(c("cat","rp100"), decimals = 0) |> 
   fmt_percent(contains("pct"), decimals = 1) |> 
-  data_color(palette = pal_nlcd)
+  data_color(
+    columns = "nlcd_class",
+    palette = pal_nlcd
+    ) |> 
+  grand_summary_rows(columns = c("cat","rp100"),fns = ~sum(.), fmt = ~fmt_number(., decimals = 0)) |> 
+  tab_style(style = cell_borders(sides = "right"), locations = cells_body(columns = "rp100_pct_cat"))
+
+```
+
+## Change since 2001
+
+Aggregating to statewide totals, the higher intensity urban cover classes increased within both local catchments and the `rp100` 100m riparian corridor. 
+
+- abs areas smaller in rp100 but appear to be roughly similar rates, proportional to overall area; earlier simple bar plot was misleading due to abs-area y-axis scale, this view suggests no appreciably lower urb increase within rp100
+
+```{r ggstatewide_ac_urb_nlcd_year}
+sc_nlcd |> 
+  summarise(
+    across(
+      contains("urb") & ends_with("ac"),
+      list(sum = ~sum(.))
+    )
+    , .by = c(nlcd_year)
+  ) |> 
+  select(-contains("urb_")) |> 
+  pivot_longer(cols = -nlcd_year, values_to = "ac") |> 
+  mutate(
+    aoi = if_else(str_detect(name, "rp100"), "rp100", "cat"),
+    nlcd_class = str_remove(name, "cat") |> str_remove("rp100") |> str_remove("_ac_sum"),
+    name = NULL
+    ) |> 
+  #filter(nlcd_class=="urbhi", aoi =="rp100") -> d; lm(ac~nlcd_year, d) -> d; broom::tidy(d); rm(d)
+  split(~nlcd_class) |> 
+  map(
+    ~.x |> 
+      ggplot(aes(nlcd_year, ac, fill = nlcd_class)) +
+      geom_col(show.legend = F) +
+      #geom_smooth(method = "lm", show.legend = F) +
+      ggpmisc::stat_poly_line(color = "blue", se = T, show.legend = F) +
+      # ggpmisc::stat_poly_eq(ggpmisc::use_label(c("adj.R2", "p")), color = "orange") +
+      ggpmisc::stat_fit_tidy(
+        method = "lm",
+        label.x = "right", label.y = "top", vjust = -0.7,
+        method.args = list(formula = y ~ x),
+        mapping = aes(
+          label = sprintf(
+            "est. slope = %.0f ac/yr", #"Slope = %.3g\np-value = %.3g",
+            after_stat(x_estimate)#, after_stat(x_p.value)
+            )
+          ),
+        color = "blue"
+      ) +
+      coord_cartesian(clip = "off") +
+      scale_fill_manual(values = pal_nlcd[grep(unique(.x$nlcd_class), names(pal_nlcd))]) + 
+      scale_y_continuous(labels = scales::comma) +
+      facet_wrap(~aoi, ncol = 2, strip.position = "top", scales = "free") +
+        labs(y = paste("acres", unique(.x$nlcd_class)), subtitle = unique(.x$nlcd_class)) +
+      theme(strip.text = element_text(hjust = 0.1))
+  ) |> 
+  wrap_plots(ncol = 1, guides = "collect")
+
+```
+
+however, considerable variation among and within wrias is evident in the relative urban cover increases...
+
+```{r ggwria_ac_urb_nlcd_year}
+sc_nlcd |> 
+  summarise(
+    across(
+      contains("urb") & ends_with("ac"),
+      list(sum = ~sum(.))
+    )
+    , .by = c(wria, wria_nr_nm, nlcd_year)
+  ) |> 
+  select(-contains("urb_")) |> 
+  pivot_longer(cols = -c(wria, wria_nr_nm, nlcd_year), values_to = "ac") |> 
+  mutate(
+    aoi = if_else(str_detect(name, "rp100"), "rp100", "cat"),
+    nlcd_class = str_remove(name, "cat") |> str_remove("rp100") |> str_remove("_ac_sum"),
+    name = NULL
+    ) |> 
+  arrange(wria, aoi, nlcd_year) |> 
+  #filter(nlcd_class=="urbhi", aoi =="rp100") -> d; lm(ac~nlcd_year, d) -> d; broom::tidy(d); rm(d)
+  filter(wria %in% wrias) |> 
+  filter(wria %in% c("1","57")) |> 
+  filter(nlcd_class == "urbhi") |> 
+  split(~nlcd_class) |> 
+  map(
+    ~.x |> 
+      ggplot(aes(nlcd_year, ac, fill = nlcd_class)) +
+      geom_col(show.legend = F) +
+      ggpmisc::stat_poly_line(color = "blue", se = T, show.legend = F) +
+      ggpmisc::stat_fit_tidy(
+        method = "lm",
+        label.x = "right", label.y = "top", vjust = -0.7,
+        method.args = list(formula = y ~ x),
+        mapping = aes(
+          label = sprintf(
+            "est. slope = %.0f ac/yr", #"Slope = %.3g\np-value = %.3g",
+            after_stat(x_estimate)#, after_stat(x_p.value)
+            )
+          ),
+        color = "blue"
+      ) +
+      coord_cartesian(clip = "off") +
+      scale_fill_manual(values = pal_nlcd[grep(unique(.x$nlcd_class), names(pal_nlcd))]) + 
+      scale_y_continuous(labels = scales::comma) +
+      facet_wrap(~wria+aoi, ncol = 2, labeller = label_wrap_gen(multi_line = F), strip.position = "top", scales = "free") +
+        labs(y = paste("acres", unique(.x$nlcd_class)), subtitle = unique(.x$nlcd_class)) +
+      theme(strip.text = element_text(hjust = 0.1))
+  ) |> 
+  wrap_plots(ncol = 1, guides = "collect")
+
+```
+
+```{r starting_refactor_arrowswarm}
+
+#steeper/more vertical indicates greater riparian increase than encompassing
+#versus flatter for surrounding increases without riparian
+
+#define comids with non-zero urban cover in final NLCD year; could threshold to larger %
+#drop second filter condition if not focusing the tree change on only those comids with +urban
+#first look showed qualitatively similar and just including many more 'rural' cats
+#further below created vector of 'urban in rp100' comids to limit even more
+
+comids_2019_urb <- sc_nlcd |> 
+  filter(nlcd_year == 2019, (urbmdcat + urbhicat > 0)) |> 
+  distinct(comid)
+
+d <- sc_nlcd |> 
+    filter(nlcd_year %in% c(2001, 2019)
+           #, comid %in% comid_2019_urb
+           ) |> 
+    select(comid, nlcd_year, wria, wria_nr_nm,
+           starts_with("urb_")) |> 
+    pivot_wider(names_from = nlcd_year, values_from = contains("cat")) |>
+    mutate(
+      d_cat = urb_cat_2019 - urb_cat_2001,
+      d_catrp100 = urb_catrp100_2019 - urb_catrp100_2001
+      ,
+      d_cat_ac = urb_cat_ac_2019 - urb_cat_ac_2001,
+      d_catrp100_ac = urb_catrp100_ac_2019 - urb_catrp100_ac_2001
+    ) |> 
+    filter(wria %in% wrias)
+
+#in pct units
+d |> 
+    ggplot() + 
+    geom_segment(aes(
+      x = urb_cat_2001, y = urb_catrp100_2001,
+      xend = urb_cat_2019, yend = urb_catrp100_2019,
+      color = d_cat - d_catrp100 
+    ),
+    arrow = arrow(length = unit(0.05,"npc")),
+    show.legend = T) +
+    geom_abline(slope = 1, intercept = 0, linetype = 3) +
+    wacolors::scale_color_wa_c("lopez", midpoint = 0) +
+    scale_x_continuous(labels = scales::percent) +
+    scale_y_continuous(labels = scales::percent) +
+    facet_wrap(~wria_nr_nm, ncol = 1, strip.position = "right") +
+    theme(strip.text = element_text(size = 5), legend.position = "top") +
+    labs(
+      title = "2001 to 2019 urban cover change",
+      subtitle = "StreamCat NLCD %urban high+medium",
+      x = "whole local catchment",
+      y = "100m riparian corridor %urban"
+    )
+
+#in acres...order of mag diffs make not very helpful other than for seeing extremes?
+d |> 
+    ggplot() + 
+    geom_segment(aes(
+      x = urb_cat_ac_2001, y = urb_catrp100_ac_2001,
+      xend = urb_cat_ac_2019, yend = urb_catrp100_ac_2019,
+      color = d_cat_ac - d_catrp100_ac 
+    ),
+    arrow = arrow(length = unit(0.05,"npc")),
+    show.legend = T) +
+    geom_abline(slope = 1, intercept = 0, linetype = 3) +
+    wacolors::scale_color_wa_c("lopez", midpoint = 0) +
+    scale_x_continuous(labels = scales::comma) +
+    scale_y_continuous(labels = scales::comma) +
+    facet_wrap(~wria_nr_nm, ncol = 1, scales = "free", strip.position = "right") +
+    theme(strip.text = element_text(size = 5), legend.position = "top") +
+    labs(
+      title = "2001 to 2019 urban cover change",
+      subtitle = "StreamCat NLCD approx acres urban high+medium",
+      x = "whole local catchment",
+      y = "100m riparian corridor"
+    )
+
+
+## NOT YET REFACTORED FROM HERE DOWN
+## "tree"
+  sc_nlcd_cat_ac |> 
+    filter(nlcd_year %in% c(2001, 2019), comid %in% comid_2019_urb) |> 
+    select(comid, nlcd_year, wria, wria_nr_nm,
+           starts_with("tree_")) |> 
+    pivot_wider(names_from = nlcd_year, values_from = contains("cat")) |>
+    mutate(
+      d_cat = tree_cat_2019 - tree_cat_2001,
+      d_catrp100 = tree_catrp100_2019 - tree_catrp100_2001
+      , 
+      d_catrp100f = case_when(
+        d_catrp100 < 0 & d_cat < 0 ~ "both dec",
+        d_catrp100 >= 0 & d_cat >= 0 ~ "both inc",
+        d_catrp100 < 0 & d_cat >= 0 ~ "rp100 dec",
+        d_catrp100 >= 0 & d_cat < 0 ~ "cat dec"
+      )
+    ) |>
+    filter(wria %in% wrias) |> 
+    #filter(d_catrp100f=="rp100 dec") |> summarise(across(contains("ac_"), sum), .by = wria_nr_nm)
+    summarise(across(contains("ac_"), sum), .by = c(d_catrp100f, wria_nr_nm)) |> 
+    mutate(
+      d_cat_ac = tree_cat_ac_2019 - tree_cat_ac_2001,
+      d_catrp100_ac = tree_catrp100_ac_2019 - tree_catrp100_ac_2001
+    ) |> 
+    select(wria_nr_nm, d_catrp100f, contains("cat_"), contains("catrp100_")) |> 
+    arrange(wria_nr_nm, d_catrp100f) |> 
+    gt(groupname_col = "wria_nr_nm", rowname_col = "d_catrp100f") |> fmt_number(decimals = 0) |> 
+    tab_style_body(fn = \(x){x<0}, style = cell_text(color = "red"))
+  ggplot() + 
+    geom_segment(aes(
+      x = tree_cat_2001, y = tree_catrp100_2001,
+      xend = tree_cat_2019, yend = tree_catrp100_2019,
+      color = d_catrp100
+    ),
+    arrow = arrow(length = unit(0.05,"npc")),
+    show.legend = T) +
+    geom_abline(slope = 1, intercept = 0, linetype = 3) +
+    wacolors::scale_color_wa_c("stuart", midpoint = 0) +
+    scale_x_continuous(labels = scales::percent) +
+    scale_y_continuous(labels = scales::percent) +
+    facet_wrap(~wria_nr_nm+d_catrp100f, ncol = 4, 
+               labeller = label_wrap_gen(multi_line = F),
+               strip.position = "right") +
+    theme(strip.text = element_text(size = 5), legend.position = "top") +
+    labs(
+      title = "2001 to 2019 tree cover change",
+      subtitle = "StreamCat NLCD %confi+decid+mxfst; comids with urban > 0 in 2019",
+      x = "whole local catchment",
+      y = "100m riparian corridor %tree"
+    )
 
 ```
 
 
-```{r ggstatewide_urb_tree}
-{ 
-ggplot() +
-  geom_sf(data = sf_flw_catrp100_2001, aes(color = urbmdcatrp100+urbhicatrp100)) +
-  scale_color_gradient(low = "lightblue", high = "grey20") +
-  labs(subtitle = "2001") + theme_minimal()
-}+{
-ggplot() +
-  geom_sf(data = sf_cat_cat_2001, aes(fill = conifcat+decidcat+mxfstcat), color = NA) +
-  scale_fill_gradient(low = "grey90", high = "darkgreen") +
-  labs(subtitle = "2001") + theme_minimal()
-} + plot_layout(ncol = 1)
-
+not usable as is, and likely not helpful due to summing over per-comid different +/- change within wria AND even with free scale hard to see smaller wria vs larger wria diffs
+```{r perwria_sum_d1901_col_by_nlcd_class}
+sc_nlcd |> 
+  filter(nlcd_year %in% c(2001, 2019)) |> 
+  select(wria, wria_nr_nm, nlcd_year, comid, contains("_ac"), -contains("urb_")) |> 
+  summarise(across(contains("_ac"), sum), .by = c(nlcd_year, wria, wria_nr_nm)) |> 
+  pivot_longer(contains("_ac")) |> 
+  mutate(
+    aoi = if_else(str_detect(name, "rp100"), "rp100", "cat"),
+    nlcd_class = str_remove(name, "cat") |> str_remove("rp100") |> str_remove("_ac"),
+    name = NULL
+    ) |> 
+  pivot_wider(names_from = nlcd_year, values_from = value) |> 
+  mutate(
+    d1901 = `2019`-`2001`,
+    d1901pct = d1901/`2001`
+    ) |> 
+  ggplot() +
+  geom_col(aes(d1901, wria, fill = nlcd_class, alpha = d1901 > 0), show.legend = F) +
+  scale_fill_manual(values = pal_nlcd) +
+  scale_alpha_manual(values = c(0.3,0.8)) +
+  geom_vline(xintercept = 0) +
+  facet_wrap(~nlcd_class, nrow = 1, scales = "free")
 ```
 
-```{r}
-sc_nlcd_2001
 
-```
-
--describe 2001: maps, distributions, tables
-  - rp100 vs cat
 -describe 2001-2019 change
   - urban increases
     - rp100
@@ -939,87 +1216,6 @@ ggplot() +
 
 ```
 
-NOT UPDATED WITH OBJECT NAME/STRUCTURE CHANGES
-```{r REDO_ORIG_streamcat_nlcd_EDA}
-#add local catchment area and riparian cover pcts to W WA flowlines (duplicated by NLCD year and AOI)
-sf_flw_sc_wa_nlcd_rp100_wwa <- sf_flw |> 
-  filter(wria %in% factor(1:25)) |> 
-  select(-fcode) |> 
-  distinct(comid, .keep_all = T) |>  #drop from 17377 to 17342
-  inner_join(
-    as_tibble(sf_cat) |> select(-geometry)
-    , by = "comid"
-  ) |> 
-  inner_join(sc_wa_nlcd_rp100, by = "comid")
-
-
-sf_flw_sc_wa_nlcd_rp100_wwa |> 
-  as_tibble() |> 
-  filter(aoi == "cat", lc == "urbrp100") |> 
-  mutate(nlcd_year = factor(nlcd_year)) |> 
-  ggplot(aes(nlcd_year, pct, group = comid)) +
-  #geom_point(aes(size = lengthkm), alpha = 0.5) + 
-  geom_line(linewidth = 0.1) +
-  scale_size_area(max_size = 3) +
-  guides(color = guide_none()) +
-  facet_wrap(~wria + lc, labeller = label_wrap_gen(multi_line = F)) +
-  labs(
-    title = "Proportion NLCD urban medium+high in NHDplus 100m riparian buffer",
-    subtitle = "Local catchment ",
-    y = "Pct. local catchment NLCD",
-  )
-
-
-tree_dtot <- sf_flw_sc_wa_nlcd_rp100_wwa |> 
-  as_tibble() |> 
-  filter(aoi == "cat", lc == "treerp100") |> 
-  arrange(nlcd_year) |> 
-  mutate(d = c(NA, diff(pct)), .by = comid) |> 
-  summarise(
-    dtot = sum(d, na.rm = T),
-    .by = c(comid, wria, lc, aoi, lengthkm)
-  )
-
-#interesting but potentially misleading/misinterpretable
-tree_dtot |> 
-  filter(abs(dtot)>0) |> 
-  ggplot() + 
-  #ggridges::geom_ridgeline(aes(lengthkm, wria, height = dtot))
-  ggridges::geom_density_ridges(aes(dtot, wria)) +
-  geom_vline(xintercept = 0, linetype = 2, linewidth = 0.5)
-
-sf_flw_sc_wa_nlcd_rp100_wwa |> 
-  as_tibble() |> 
-  filter(aoi == "cat", lc == "treerp100") |> 
-  mutate(nlcd_year = factor(nlcd_year)) |> 
-  inner_join(
-    tree_dtot |> filter(abs(dtot)>0) |> select(comid, dtot) |> mutate(dtot_lgl = dtot > 0)
-    , by = "comid"
-  ) |> 
-  ggplot(aes(nlcd_year, pct, group = comid, color = dtot_lgl)) +
-  #geom_point(aes(size = lengthkm), alpha = 0.5) + 
-  geom_line(linewidth = 0.2) +
-  scale_size_area(max_size = 3) +
-  scale_color_manual(values = c("orange","darkgreen")) +
-  guides(color = guide_none()) +
-  facet_wrap(~wria + lc, labeller = label_wrap_gen(multi_line = F)) +
-  labs(
-    title = "Proportion NLCD tree/forest in NHDplus 100m riparian buffer",
-    subtitle = "Local catchment ",
-    y = "Pct. local catchment NLCD",
-  )
-
-tree_dtot |> 
-  filter(abs(dtot)>0) |> 
-  mutate(dtot_lgl = dtot > 0) |> 
-  ggplot() +
-  geom_point(aes(dtot, lengthkm, color = dtot_lgl), alpha = 0.5) +
-  scale_color_manual(values = c("orange","darkgreen")) +
-  scale_y_log10() +
-  guides(color = guide_none()) +
-  facet_wrap(~wria, ncol = 1, scales = "free_y", strip.position = "right")
-
-```
 
 ```{r sc_wa_bfw, eval=FALSE}
 sc_wa_bfw <- StreamCatTools::sc_get_data(
