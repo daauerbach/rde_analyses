@@ -1,5 +1,5 @@
 ---
-title: "Riparian Data Engine: salmon distribution & tree loss"
+title: "Assessing Washington's Riparian Land Cover"
 author: "dan.auerbach@dfw.wa.gov"
 date: "`r Sys.Date()`"
 format:
@@ -16,7 +16,7 @@ format:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, fig.width = 8, fig.height = 10)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.width = 8, fig.height = 10)
 
 library("tidyverse", quietly = T)
 library("sf")
@@ -26,411 +26,26 @@ theme_set(theme_minimal())
 
 dir_data_common <- "~/T/DFW-Team WDFW Watershed Synthesis - data_common"
 epsg <- 2927 #WA state standard; NAD83(HARN)/ft
-
-#sort(unique(rde$t_imp_f))
-pal_t_imp_f <- c("1" = "darkgreen", "2" = "orange", "3" = "yellow", "4|5" = "#965127", "NA" = "grey") 
-pal_swifd_chin <- c("not_salmon" = NA, "salmon_not_chin" = "tan", "salmon_with_chin" = "salmon")
-
-sf_wrias <- sf::read_sf(file.path(dir_data_common, "WR_WAT_WRIA.gdb/")) |>
-  mutate(
-    wria = factor(WRIA_NR),
-    wria_nr_nm = paste0(str_pad(WRIA_NR,width = 2, pad = "0",),"_",WRIA_NM) |> factor()) |>
-  select(WRIA_NR, WRIA_NM, wria, wria_nr_nm, acres = WRIA_AREA_ACR_QT) |> arrange(wria) |> 
-  sf::st_transform(sf::st_crs(epsg))
-
-sf_tess_01_25_rmz_cntrd_pts <- readRDS("sf_tess_01_25_rmz_cntrd_pts.rds")
-
 ```
 
-# Background 
+# Introduction
 
-The [Riparian Data Engine (RDE)](https://ripariandata.wdfw.wa.gov/), developed by WDFW with support from ESA, is a geospatial web application that "unites WDFW riparian datasets in Washington State...allow[ing] planners to evaluate the conditions of riparian ecosystems and make data-informed planning decisions".
+The term 'riparian' designates where streams and rivers meet and mingle with uplands. As with other ecological edges, this meeting place is host to many mutually enriching physical and biological exchanges. These hydro-geo-eco interactions are understood to provide numerous 'services' of value to people, leading to laws and policies seeking to protect more intact riparian areas and rehabilitate their degradation.
 
-Following publication of the Volume 1 Science Synthesis [(Quinn et al. 2020)](https://wdfw.wa.gov/publications/01987) and Volume 2 Management Recommendations [(Rentz et al. 2020)](https://wdfw.wa.gov/publications/01988), the agency has developed several technical tools to support implementation (see https://wdfw.wa.gov/species-habitats/ecosystems/riparian).
+In Washington state, within the federal statutory context of the Clean Water Act, Endangered Species Act, and various others, the 'realized riparian regulatory regime' emerges from several land use frameworks including the Shoreline Management Act, the Forest Practices Act, and the Growth Management Act.
 
-The RDE enables interactive exploration of various landscape attributes associated with riparian management zone (RMZ) polygons that were consistently generated according to the [Site Potential Tree Height standard](https://wdfw.wa.gov/publications/02564) using publicly available GIS data.
+[...]
+https://ofm.wa.gov/sites/default/files/public/publications/RiparianTaskforcePreliminaryRecommendationsMay2024.pdf
+[...]
 
-Interactive users of the RDE can examine a "reach table" consisting of columns of various land cover, jurisdictional, and hydrographic attributes for rows corresponding to individual RMZ units in the polygon tessellation with which attribute values were calculated. Various filters and map-based exploration allow formulation of queries that subset these rows and enable comparison of summarized attribute values. For example, a filter for tree canopy cover greater than 50% can be used to examine the number and location of such RMZs within a Water Resource Inventory Area (WRIA) or a county. In addition, a powerful feature provided by the RDE is the display of a single reach relative to its upstream and downstream network "neighborhoods" and the attributes of those areas. This "local view" is well suited to understanding how conditions in a particular location compare to adjacent portions of the riverscape with hydrologic, geomorphic and ecological connections. Such information can help to inform a range of conservation management decisions at the site scale.
-
-This analysis broadens to a regional scale, quantifying patterns per-WRIA, based on the full set of complete-WRIA reach tables, accessed via an API.
-
-# Data & Analysis
-
-```{r build_rde_wria_library, include=FALSE, eval=FALSE}
-# created 4/23/25 after API first exposed
-# see rde_wrias_init.qmd for scraping calls, not yet rerun to check any issues from baseurl changes
-
-# https://api-riparis.esa-prod.sitkatech.com/docs/index.html 
-# Reaches for a County: https://api-riparis.esa-prod.sitkatech.com/counties/{countyName}/reaches/csv
-# Reaches for a WRIA: https://api-riparis.esa-prod.sitkatech.com/wrias/{wriaID}/reaches/csv
-# Reach table contents for a Reach: https://api-riparis.esa-prod.sitkatech.com/reaches/{permanentIdentifier}/ csv
-
-# rch_tbl <- map_df(1:62, ~readr::read_csv(
-#   file.path(dir_data_common, paste0("rde/wrias/rde_wria_",stringr::str_pad(.x, 2, pad = "0"), ".csv"))
-# ) |> 
-#   mutate(pid = as.character(PermanentIdentifier), PermanentIdentifier = NULL)
-# ) |> 
-#   rename(wria = WaterResourceInventoryAreaID) |> 
-#   rename_with(~str_replace(.,"Acres","_ac")) |> 
-#   janitor::clean_names() |> 
-#   select(pid, everything(), -reach_id)
-# 
-# saveRDS(rch_tbl, "~/T/DFW-Team WDFW Watershed Synthesis - data_common/rde/wria_rch_tlb.rds")
-```
-
-A complete set of reach tables includes values for >1mil rows statewide, indexed by `pid` (permanent identifiers). In this structure, a `pid`-row can include a combination of "extent of observed water" (EOW), "floodplain" (primarily based on FEMA mapping), and riparian management zone (RMZ, both banks where double-banked) geometry. However, the results presented here are based on the area (acreage) associated with the RMZ and EOW "riparian corridor".
-
-```{r rde}
-rde <- readRDS("~/T/DFW-Team WDFW Watershed Synthesis - data_common/rde/wria_rch_tlb.rds") |> 
-  mutate(
-    wria = factor(wria)
-    ,
-    swifd_any = !is.na(swifd_salmon_distribution),
-    swifd_n = 1 + str_count(swifd_salmon_distribution,","),
-    swifd_n_fct = case_when(
-      is.na(swifd_n) ~ "none",
-      swifd_n < 3 ~ "1-2 species",
-      swifd_n >= 3 ~ "3 or more species"
-    ),
-    swifd_chin = case_when(
-      str_detect(swifd_salmon_distribution, "Chin") ~ "salmon_with_chin",
-      str_detect(swifd_salmon_distribution, "Chin", negate = T) ~ "salmon_not_chin",
-      is.na(swifd_salmon_distribution) ~ "not_salmon"
-    )
-    ,
-    # #1:meets WQS, 2:some concerns about some uses, 3:insuf data, 4:impair-no-TMDL, 5:TMDL
-    ## NOTE - the status "Not Impaired" in this version of the csvs is not accurate
-    ## as of 6/6/25 ver 0.0.1 the production reach table is (more accurately) "Not Assessed"
-    ## this may have been corrected in prod API but need to check with Ray
-    ## here manually overwriting
-    t_imp = temperature_impairments |> str_replace("Impaired", "Assessed") |> factor()
-    , 
-    tree_pct = all_tree_cover_ac / all_land_cover_ac,
-    veg_pct = all_vegetated_ac / all_land_cover_ac
-  ) 
-
-# #corresponds to nrow of reach table in ver 0.0.1 with EOW and Floodplain in Zone filter unchecked
-# rde |> filter(wria==1, rmz_ac!=0)
-# #but is NOT the same as 
-# rde |> filter(wria==1, eow_ac==0, flood_ac==0)
-# #which are PIDs with _only_ RMZ
-# #no way in this table structure, without a 'zone' attribute', to differentiate RMZ-EOW-Floodplain...
-
-```
-
-The Statewide Integrated Fish Distribution [(SWIFD)](https://geo.wa.gov/datasets/wdfw::statewide-washington-integrated-fish-distribution/explore?location=47.239717%2C-120.672158%2C8.61) dataset characterizes the documented and presumed presence of several salmonid species. These data allow stratification of RDE units, indexed by `pid` (permanent identifiers), into the portion within each WRIA directly associated with any salmon occupancy and use, as well as whether Chinook are known or presumed to use the reach.
-
-Across all WRIAs statewide, nearly 90% of the RMZ area included in the RDE has no salmon presence based on SWIFD. Roughly equal areas of RMZs are associated with Chinook versus all other species, but the EOW (extent of observed water) area is considerably larger for Chinook reaches (~43% vs ~15%), following expectations for the species' tendency to favor lower, larger portions of river networks.
-
-```{r gt_rde_swifd_any_swifd_chin_wria_all}
-rde |> 
-  summarise(
-    pid_n = n(),
-    across(c(riparian_ac, rmz_ac, eow_ac), list(sum = ~sum(., na.rm = T))),
-    .by = c(swifd_any, swifd_chin)
-  ) |> 
-  mutate(across(-starts_with("swifd"), list(pct = ~round(. / sum(.), 3)))) |> 
-  arrange(swifd_any, swifd_chin) |> 
-  select(swifd_any, swifd_chin,
-         #starts_with("pid"),
-         starts_with("ripar"),
-         starts_with("rmz"),
-         starts_with("eow")
-         ) |> 
-  gt(caption = md("Total area of reaches with any salmon and Chinook use, per SWIFD  \nall WRIAs statewide")) |> 
-  fmt_percent(ends_with("pct"), decimals = 1) |> 
-  fmt_number(ends_with("sum"), decimals = 0, use_seps = T) |> 
-  tab_style(locations = cells_body(columns = ends_with("sum")), style = cell_borders("left")) |> 
-  tab_spanner("Riparian corr.", contains("ripar")) |> 
-  tab_spanner("RMZ", contains("rmz")) |> 
-  tab_spanner("EOW", contains("eow")) |> 
-  cols_label_with(fn = ~str_remove_all(., "riparian_|rmz_|eow_"))
-```
-
-The WRIAs west of the Cascade crest (1-25) show an increased portion of the overall riparian corridor and RMZ extent associated with salmon. However, this area still represents less than 25% of the full area encompassed by the SPTH200 tessellation of the RDE, which extends throughout the upper portions of river networks beyond reaches identified in SWIFD. Further, the relative proportion of salmon occupancy varies considerably across this set of watershed divisions.
-
-```{r gt_rde_swifd_any_swifd_chin_wria_1_25}
-rde |> 
-  filter(as.integer(as.character(wria)) < 26) |>
-  summarise(
-    pid_n = n(),
-    across(c(riparian_ac, rmz_ac, eow_ac), list(sum = ~sum(., na.rm = T))),
-    .by = c(swifd_any, swifd_chin)
-  ) |> 
-  mutate(across(-starts_with("swifd"), list(pct = ~round(. / sum(.), 3)))) |> 
-  arrange(swifd_any, swifd_chin) |> 
-  select(swifd_any, swifd_chin,
-         #starts_with("pid"),
-         starts_with("ripar"),
-         starts_with("rmz"),
-         starts_with("eow")
-         ) |> 
-  gt(caption = md("Total area of reaches with any salmon and Chinook use, per SWIFD  \nWestern WA WRIAs 1 - 25")) |> 
-  fmt_percent(ends_with("pct"), decimals = 1) |> 
-  fmt_number(ends_with("sum"), decimals = 0, use_seps = T) |> 
-  tab_style(locations = cells_body(columns = ends_with("sum")), style = cell_borders("left")) |> 
-  tab_spanner("Riparian corr.", contains("ripar")) |> 
-  tab_spanner("RMZ", contains("rmz")) |> 
-  tab_spanner("EOW", contains("eow")) |> 
-  cols_label_with(fn = ~str_remove_all(., "riparian_|rmz_|eow_"))
-```
-
-```{r gg_rde_swifd_any_pts}
-sf_tess_01_25_rmz_cntrd_pts |> 
-  slice_sample(n = 300000) |> 
-  ggplot() + geom_sf(aes(color = swifd_any), size = 0.2, alpha = 0.1, show.legend = F) + 
-  geom_sf(data = sf_wrias |> filter(WRIA_NR<26), color = "grey30", fill = NA, linewidth = 0.2) +
-  scale_color_manual(values = c("lightblue", "darkblue")) +
-  labs(title = "RMZ units with salmon use (SWIFD)",
-       subtitle = "Western WA WRIAs 1 - 25, any species")
-```
-
-Extensive land cover and land use change has occurred in these Western Washington watersheds, prompting regulatory efforts to limit ongoing tree loss within riparian ecosystems and prevent further riverscape habitat degradation. Accordingly, an important applied conservation question concerns how recent reductions in tree cover are distributed within these riparian networks, particularly relative to the salmon occupied portions.
-
-The high resolution change detection dataset [(HRCD)](https://hrcd-wdfw.hub.arcgis.com/) included within the RDE provides a means to address this question with remote sensed empirical observations of anthropogenic tree loss between 2012-2017.
-
-```{r pending_question_to_hrcd_team, include=FALSE, eval=FALSE}
-#difference between blanks and zeros?
-#I think blanks correspond to an RMZ poly with no HRCD poly intersection, 
-#versus '0' from an RMZ intersection with an HRCD poly that for whatever reason didn't include tree loss area?
-#some instances of anth_loss = 0 and nat_loss = 0, so I'm guessing those could be impervious related?
-rde |> 
-  #filter(as.integer(as.character(wria)) < 26) |>
-  filter(wria == "7") |>
-  #count(is.na(anthropogenic_change_origin_ac))
-  count(anthropogenic_change_origin_ac >= 0)
-
-rde |> 
-  filter(wria == "7") |> #42465
-  filter(anthropogenic_change_origin_ac == 0) |>  #638
-  filter(anthropogenic_change_origin_ac == 0, natural_change_origin_ac == 0) #74
-
-```
-
-Areas of tree loss are apparent at a regional scale, but specific relationships to salmon distribution are more difficult to discern.
-
-```{r gg_rde_swifd_any_pts_tree_loss}
-sf_tess_01_25_rmz_cntrd_pts |>
-  #filter(swifd_any) |> #as_tibble() |> count(anthropogenic_change_origin_ac > 0)
-  slice_sample(n = 250000) |> 
-  mutate(
-    anth_chg = replace_na(anthropogenic_change_origin_ac, 0)
-  ) |> 
-  ggplot() + geom_sf(aes(color = anth_chg > 0), size = 0.2, alpha = 0.3, show.legend = F) + 
-  scale_color_manual(values = c("#516F25", "orange")) +
-  #facet_wrap(~swifd_any)
-  labs(title = "RMZ units with any anthropogenic tree loss (HRCD)",
-       subtitle = "Western WA WRIAs 1 - 25")
-```
-
-**Table to make nicer pending feedback**
-
-Across these WRIAs, the aggregated area of RMZs associated with salmon forms roughly 20% of total riparian corridor area, while the proportion of the total RMZ tree cover area within salmon reaches is slighly lower at roughly 19%. Although the total tree cover area is ~75% of the total RMZ area (~2.9m/3.9m acres), this suggests that, at this scale, riparian tree cover approximately corresponds to a null expectation for salmon distribution, with neither a starkly higher or lower concentration of the overall treed area within salmon occupied RMZs (i.e., the limit case of 100% tree cover in salmon RMZs with the same total tree area would represent ~27% rather than ~19%). Nonetheless, these values also mean that in non-salmon reaches, tree cover acres are ~75% of total acres (2.36m/3.14m) versus ~69% for salmon associated (550K/802K).
-
-In contrast, the proportion of tree loss acres within salmon reaches is less than half of the tree cover area and total area proportions, suggesting that measured decreases *are* concentrated in non-salmon areas to a greater degree than would be expected based only on relative total area. 
-
-```{r gt_rde_swifd_any_hrcd_wria_1_25}
-rde |>
-  filter(as.integer(as.character(wria)) < 26) |> 
-  summarise(
-    across(
-      c(riparian_ac, 
-        tree_cover_ac = all_tree_cover_ac, 
-        tree_loss_ac = anthropogenic_change_origin_ac),
-      list(sum = ~sum(., na.rm = T))
-      )
-    , .by = c(swifd_any)
-  ) |> 
-  mutate(across(ends_with("sum"), list(pct = ~./sum(.)))) |> 
-  pivot_longer(-c(swifd_any)) |> 
-  mutate(
-    var = str_sub(name, -3, -1),
-    name = str_remove(name, "_sum") |> str_remove("_pct") |> factor()
-    ) |> 
-  pivot_wider(names_from = var, values_from = value) |> 
-  arrange(name, swifd_any) |> 
-  gt(groupname_col = "name", row_group_as_column = T) |> 
-  fmt_percent("pct", decimals = 1) |> 
-  fmt_number("sum", decimals = 0)
-
-## could work up further/better?
-# rde |>
-#   filter(as.integer(as.character(wria)) < 26) |> 
-#   select(swifd_any, riparian_ac, 
-#         tree_cover_ac = all_tree_cover_ac, 
-#         tree_loss_ac = anthropogenic_change_origin_ac) |> 
-#   mutate(tree_loss_ac = replace_na(tree_loss_ac, 0)) |> 
-#   pivot_longer(-c(swifd_any)) |> 
-#   ggplot() + 
-#   geom_boxplot(aes(name, value, color = swifd_any), varwidth = T) +
-#   scale_y_log10()
-
-```
-
-These relationships are better examined with further stratification by WRIA, where several possible patterns emerge.
-
-At this scale, individual WRIAs vary both in terms of the relative proportions of cover and loss, including some that depart from the regional pattern. 
-
-WRIAs 12 and 13 have relatively higher cover than null expectation...
-
-Most WRIAs show the lower proportion of loss versus cover that suggest tree decreases concentrated away from salmon reaches...and Skagit/3 despite lower cover than area has even lower-lower loss...but Cedar-Sam/8, Duwam/9, ELDU/18
+This analysis offers a landscape-scale perspective on conditions and changes within a simple, spatially-defined riparian corridor, using readily-available datasets to examine broad patterns that span numerous jurisdictions as well as substantial hydroclimate and habitat variation. A primary focus is on "urban" cover as an indicator of imperviousness. Impervious cover has statewide relevance in mesic (western) and semi-arid (eastern) regions, and is well-understood to be associated with ecohydrologic degradation.
 
 
-```{r rde_anth_wria_swifd_any}
-##tree loss change in W WA salmon reaches, ignoring 303d
-rde_anth_wria_swifd_any <- rde |>
-  summarise(
-    across(
-      c(riparian_ac, 
-        tree_cover_ac = all_tree_cover_ac, 
-        tree_loss_ac = anthropogenic_change_origin_ac),
-      list(sum = ~sum(., na.rm = T))
-      ),
-    .by = c(wria, swifd_any)
-  ) |> 
-  mutate(
-    across(ends_with("sum"), list(pct = ~./sum(.))),
-    .by = wria
-  ) |> 
-  pivot_longer(-c(wria, swifd_any)) |> 
-  mutate(
-    var = str_sub(name, -3, -1),
-    name = str_remove(name, "_sum") |> str_remove("_pct") |> factor()
-    ) |> 
-  pivot_wider(names_from = var, values_from = value) #|> pull(name) |> unique() |> sort()
+# Data & methods 
 
-```
+The [`StreamCatTools`](https://github.com/USEPA/StreamCatTools) (Weber 2025) R package was used to access the [StreamCat dataset](https://www.epa.gov/national-aquatic-resource-surveys/streamcat-dataset) (Hill et al. 2016), which delivers consistently geoprocessed attribute values for each reach unit of the original medium resolution NHDPlus hydrography (derived from a 30m DEM and sometimes termed "1:100K"; this is the precursor to subsequent continental elevation derived hydrographic datasets NHDPlusHR from 10m DEM and 3DHP from LiDAR). For each reach 'comid', attribute values from many raster and rasterized datasets are calculated within the local contributing catchment ('`cat`') as well as a 100m riparian buffer ('`rp100`') on "stream lines and on-network NLCD water pixels". *Not yet using Ws/Wsrp100, but add description here if added below*
 
-```{r gg_rde_anth_wria_swifd_any_parallel}
-{
-  rde_anth_wria_swifd_any |>   
-    filter(as.integer(as.character(wria)) < 26, swifd_any) |> 
-    ggplot(aes(name, pct, group = wria)) +
-    geom_line(linewidth = 0.3) +
-    geom_point(aes(color = name, size = sum)) + 
-    geom_text(aes(label = wria), size = 3,
-              #position = position_dodge(width = 0.5)
-              nudge_x = -0.05
-    ) +
-    scale_color_manual(values = c("tan","darkgreen","orange"), guide = "none") +
-    scale_size_area(guide = "none") +
-    labs(x = NULL, y = "Proportion", 
-         title = "SWIFD/salmon RMZ area as proportion of WRIA total",
-         subtitle = "Point size scaled to total acres")
-}+{
-  sf_wrias |> 
-    left_join(rde_anth_wria_swifd_any, by = "wria") |> 
-    filter(as.integer(as.character(wria)) < 26, swifd_any) |> 
-    ggplot() + geom_sf(aes(fill = name, alpha = pct), color = "grey80", linewidth = 0.1) + 
-    scale_fill_manual(values = c("tan","darkgreen","orange"), aesthetics = c("fill","color"), guide = "none") +
-    scale_alpha(name = "Prop.", guide = "none") +
-    facet_wrap(~name) #+ theme(legend.position = "bottom")
-}+
-  plot_layout(ncol = 1)
-```
-
-```{r gt_rde_anth_wria_swifd_any}
-# rde_anth_wria_swifd_any |>   
-#   filter(as.integer(as.character(wria)) < 26, swifd_any, str_detect(name, "loss")) |> 
-#   gt("Acres and proportion of tree loss within salmon reaches") |> 
-#   cols_hide(columns = c("swifd_any","name")) |> 
-#   fmt_percent("pct", decimals = 1) |> 
-#   fmt_number("sum", decimals = 1)
-
-rde_anth_wria_swifd_any |>   
-  filter(as.integer(as.character(wria)) < 26, swifd_any) |> 
-  pivot_wider(names_from = name, values_from = c(sum, pct)) |> 
-  select(wria, contains("rip"), contains("cover"), contains("loss")) |> 
-  gt("Acres and proportion of total area, tree cover, and tree loss within salmon reaches") |> 
-  fmt_percent(contains("pct"), decimals = 1) |> 
-  fmt_number(contains("sum"), decimals = 0) |> 
-  tab_style(style = cell_fill("darkgreen", 0.3), locations = cells_body(contains("cover"))) |> 
-  tab_style(style = cell_fill("orange", 0.3), locations = cells_body(contains("loss")))
-
-
-```
-
-Needs work 
-
-```{r gg_tree_loss_points}
-# rde_anth_wria_swifd_any |>   
-#   filter(as.integer(as.character(wria)) < 26, swifd_any) |> 
-#   pivot_wider(names_from = name, values_from = c(sum, pct)) |> 
-#   filter(pct_tree_loss_ac > pct_tree_cover_ac)
-
-sf_tess_01_25_rmz_cntrd_pts |> 
-  #filter(swifd_any, wria %in% c("4","8","9","10","18")) |> 
-  filter(swifd_any, wria %in% c("8","9","10","18",
-                                "12","13","14","24")) |> 
-  mutate(tree_loss = replace_na(anthropogenic_change_origin_ac, 0)) |> 
-  split(~wria, drop = T) |> 
-  map(
-    ~.x |> 
-      ggplot() + 
-      geom_sf(aes(color = tree_loss > 0),
-              size = 0.2, alpha = 0.3, show.legend = F) + 
-      scale_color_manual(values = c("#516F25", "orange")) +
-      facet_wrap(~wria)
-  ) |> 
-  wrap_plots(ncol = 2)
-```
-
-
-::: {.content-hidden when-format="html"}
-
-```{r streamcat_nlcd_get}
-##from trap_attr.qmd which also has association of broader streamcat attrib to point location
-##imperv only, cat/ws-wide NOT riparian
-#read_csv(file.path(dir_data_common,"streamcat/ImperviousSurfaces_WA.csv")) |> 
-# select(COMID, WsAreaSqKm, paste0("PctImp",c(2001,2004,2006,2008,2011,2013,2016,2019),"Ws"))
-
-## recall riparian buffers are 100m, per https://www.epa.gov/national-aquatic-resource-surveys/streamcat-dataset-readme 
-## older flow_trees_heat.qmd has initial extensive EDA and object creation
-## then  flow_trees_apps.qmd has creation of riparian-only 'sc_wa_nlcd/sc_wa_nlcd_rp100.rds' (copied into hpas_ugas_hrcd.qmd)
-## also differencing of 2019-2011 composite imperv and tree
-## older saved rds has 2011,2013,2016,2019 WsRp100 and CatRp100: sc_wa_nlcd <- readRDS(file.path(dir_data_common, "streamcat", "sc_wa_nlcd_rp100.rds"))
-
-## not up on github anywhere, so repeating a slightly modified version here for reference
-
-# # # list of 8 NLCD for all WA, 57313 rows/comids by (16categories x 2aoi cols)
-# # sc_wa_nlcd_rp100 <- map(
-# #   set_names(c(2001, 2004, 2006, 2008, 2011, 2013, 2016, 2019))
-# #   ,
-# #   ~StreamCatTools::sc_nlcd(
-# #     state = "WA", year = .x,
-# #     aoi = 'catrp100,wsrp100'
-# #   ) |>
-# #     rename_with(tolower) |> as_tibble() |>
-# #     mutate(comid = as.character(comid), nlcd_year = .x)
-# # )
-# # saveRDS(sc_wa_nlcd_rp100, file.path(dir_data_common, "streamcat", "sc_wa_nlcd_rp100.rds"))
-# 
-# #pull all 4 AOI, including abs areasqkm
-# sc_wa_nlcd <- map(
-#   set_names(c(2001, 2004, 2006, 2008, 2011, 2013, 2016, 2019))
-#   ,
-#   ~StreamCatTools::sc_nlcd(
-#     state = "WA", year = .x,
-#     aoi = 'cat,catrp100,ws,wsrp100',
-#     showAreaSqKm = T
-#   ) |>
-#     rename_with(tolower) |> as_tibble() |>
-#     mutate(comid = as.character(comid), nlcd_year = .x)
-# )
-# saveRDS(sc_wa_nlcd, file.path(dir_data_common, "streamcat", "sc_wa_nlcd.rds"))
-
-```
-
-```{r streamcat_nlcd_setup_sf_objects}
-library("tidyverse", quietly = T)
-library("sf")
-library("patchwork")
-library("gt")
-theme_set(theme_minimal()) 
-
-dir_data_common <- "~/T/DFW-Team WDFW Watershed Synthesis - data_common"
-epsg <- 2927 #WA state standard; NAD83(HARN)/ft
-
+```{r objects_sf}
 sf_wrias <- sf::read_sf(file.path(dir_data_common, "WR_WAT_WRIA.gdb/")) |>
   mutate(
     wria = factor(WRIA_NR),
@@ -461,22 +76,176 @@ sf_cat <- readRDS(file.path(dir_data_common, "NHDPlus17/sf_nhdp_wa_cat.rds"))
 # distinct(as_tibble(sf_flw), comid) #66116
 # distinct(as_tibble(sf_cat), comid) #57306
 # #flowlines with no cat are most pipelines & canalditch (~3K), a third of coastline
-# #but also many scattered streamriver and artificalpath
-# #statewide but large concentrations in yakima region
-# sf_flw |> 
-#   #as_tibble() |> count(ftype) |> mutate(pct = n/sum(n))
-#   anti_join(distinct(as_tibble(sf_cat)), by = "comid") |> #9067
-#   #ggplot() + geom_sf() + geom_sf(data = sf_wrias, fill = NA, color = "red")
-#   #as_tibble() |> count(ftype) |> mutate(pct = n/sum(n))
-#   mapview()
+# #but also many scattered streamriver and artificalpath statewide but large concentrations in yakima region
 # #cat with no flowlines are edge cases, a pothole depressional area SE of Okanagon plus a few other scattered Eastside
-# sf_cat |>
-#   anti_join(distinct(as_tibble(sf_flw), comid), by = "comid") |>#257
-#   ggplot() + geom_sf() + geom_sf(data = sf_wrias, fill = NA, color = "red")
 
 ```
 
--starting object with ac, and urb_ and tree_?
+StreamCat includes values calculated from 8 cycles of the National Land Cover Dataset: 2001, 2004, 2006, 2008, 2011, 2013, 2016, and 2019. The NLCD consists of a raster based on random forest classification of satellite and other imagery sources [(Wickham et al. 2023)](https://www.tandfonline.com/doi/full/10.1080/15481603.2023.2181143) These represent the percentages of each of 16 land cover classes within each of the *cat* and *catrp100* areas of interest  (AOI), so that the sum across classes is 1 for each AOI (i.e., the *rp100* area is spatially nested, but `rp100` percentages are provided as distinct rather than proportional to the total *cat* area). Approximate acreages were back-calculated as
+
+$$ acres = pct_{nlcd-class} * areasqkm_{cat|catrp100} * 247.11$$.
+
+The StreamCat process and NLCD datasets have undergone thorough QAQC and been extensively reviewed since their initial development, resulting in their widespread use in various scientific studies (see Wickham et al 2023 for the most recent NLCD validation study). Nonetheless, as with any remote sensed empirical data, some error unavoidably persists, and several key caveats are important to note.
+
+  - The underlying hydrography flowlines and catchment polygon mesh have positional error; not all streams, drainage divides, and/or riparian buffer corridors are 'where they should be'.
+  - Within any particular NLCD year, substantial 'on the ground' real-world land cover variation can occur within the 30m pixel resolution, such that the single assigned land cover class is the dominant spectral signature (i.e., on the per-pixel scale, classification accuracy is more likely to increase with homogeneity of cover types). 
+  - Between different NLCD years, a change in NLCD class may be due to sudden, substantial activity (e.g., a clear cut; fallowing or crop rotation; a new parking lot); to gradual, accumulative shifts of the fine-scale mix of types within-pixel; or potentially to spurious imagery artifacts rather than ground-level change.
+
+Accordingly, these data are a standardized, consistent means to investigate larger-scale, general or cumulative patterns. 
+ 
+```{r objects_streamcat_nlcd}
+## recall riparian buffers are 100m, per https://www.epa.gov/national-aquatic-resource-surveys/streamcat-dataset-readme 
+ 
+# #pull all 4 AOI, including abs areasqkm
+# sc_wa_nlcd <- map(
+#   set_names(c(2001, 2004, 2006, 2008, 2011, 2013, 2016, 2019))
+#   ,
+#   ~StreamCatTools::sc_nlcd(
+#     state = "WA", year = .x,
+#     aoi = 'cat,catrp100,ws,wsrp100',
+#     showAreaSqKm = T
+#   ) |>
+#     rename_with(tolower) |> as_tibble() |>
+#     mutate(comid = as.character(comid), nlcd_year = .x)
+# )
+# saveRDS(sc_wa_nlcd, file.path(dir_data_common, "streamcat", "sc_wa_nlcd.rds"))
+
+#starting object with cat and catrp100 (no Ws)
+#inner_join of sf_cat to add WRIA
+#dropping 231 comids with NA rp100
+#converting pcts to 0-1
+#appending 'ac[res]' cols as AOI-specific product of pct and areasqkm
+sc_nlcd <- readRDS(file.path(dir_data_common, "streamcat", "sc_wa_nlcd.rds")) |> 
+  map(
+    ~.x |> 
+      rename_with(
+        ~str_remove(.,paste(c(2001, 2004, 2006, 2008, 2011, 2013, 2016, 2019),collapse = "|")) |> 
+          str_remove("pct")
+        ) |> 
+      select(comid, nlcd_year, 
+             catareasqkm, catareasqkmrp100,
+             ends_with("cat"), ends_with("catrp100"))
+      ) |> 
+  list_rbind() |> 
+  inner_join(as_tibble(sf_cat) |> select(comid, wria, wria_nr_nm), by = "comid") |> 
+  drop_na(urbmdcatrp100) |> #single lu class captures all 231 comids NA for rp100 vals
+  mutate(
+    across(c(ends_with("cat"), ends_with("catrp100")), ~./100)
+    ,
+    # tree_cat = conifcat + decidcat + mxfstcat,
+    # tree_catrp100 = conifcatrp100 + decidcatrp100 + mxfstcatrp100,
+    urb_cat = urbhicat + urbmdcat,
+    urb_catrp100 = urbhicatrp100 + urbmdcatrp100
+    ,
+    across(ends_with("cat"), list(ac = ~.* catareasqkm * 247.11)),
+    across(ends_with("catrp100"), list(ac = ~.* catareasqkmrp100 * 247.11))
+    )
+
+#going fast, just presumes nlcd_class sorted alphabetically
+pal_nlcd <- c("brown","darkgreen","yellow","green","yellowgreen",
+              "yellow","seagreen","white","green","blue",
+              "tan","grey10","grey30","grey60","grey80","seagreen")
+
+
+```
+
+urbop: <20% impv
+urbloL 20-50% impv
+urbmd: 50-79% impv
+urbhi: >80% impv
+
+*other/more*
+  - (eastern US, comparison against 1m^2 urban cover showed very good agreement overall, somewhat worse for riparian exclusively)
+    - https://www.usgs.gov/publications/accuracy-assessment-nlcd-2011-impervious-cover-data-chesapeake-bay-region-usa
+  - bring back sc_imperv?
+```{r pctimp_back, eval=F}
+"~/T/DFW-Team WDFW Watershed Synthesis - data_common/streamcat/ImperviousSurfacesRipBuf100_WA.csv"
+StreamCatTools::sc_get_data(
+  comid = "23989097", metric = "pctimp2001",
+  # state = "WA", year = .x,
+  aoi = 'cat,catrp100,ws,wsrp100',
+  showAreaSqKm = T
+  ) |>
+  rename_with(tolower) |> as_tibble()
+sc_nlcd_2001 |> filter(comid =="23989097")
+
+```
+
+
+# A 2001 Baseline
+
+```{r sc_nlcd_2001_sf_2001}
+sc_nlcd_2001 <- sc_nlcd |> 
+  filter(nlcd_year==2001) 
+
+sf_flw_catrp100_2001 <- sf_flw |> 
+  inner_join(
+    select(sc_nlcd_2001, comid, ends_with("catrp100")),
+    by = "comid"
+  )
+sf_cat_cat_2001 <- sf_cat |> 
+  inner_join(
+    select(sc_nlcd_2001, comid, ends_with("cat")),
+    by = "comid"
+  )
+```
+
+```{r statewide_area_overall}
+sc_nlcd_2001 |> 
+  summarise(across(contains("areasqkm"), sum)) |> 
+  pivot_longer(contains("areasqkm"), names_to = "aoi", values_to = "sqkm") |> 
+  mutate(
+    aoi = str_remove(aoi, "areasqkm"),
+    ac = sqkm * 247.11) |> 
+  gt() |> fmt_number(decimals = 0)
+```
+
+```{r statewide_area_cat_rp100}
+sc_nlcd_2001 |> 
+  select(comid, contains("_ac"), -contains("urb_")) |> 
+  summarise(across(contains("_ac"), sum)) |> 
+  pivot_longer(contains("_ac")) |> 
+  mutate(
+    aoi = if_else(str_detect(name, "rp100"), "rp100", "cat"),
+    nlcd_class = str_remove(name, "cat") |> str_remove("rp100") |> str_remove("_ac"),
+    name = NULL
+    ) |> 
+  pivot_wider(names_from = aoi, values_from = value) |>
+#recall these acreages are still nested: 
+#catareasqkm includes catareasqkmrp100
+  mutate(
+    rp100_pct_cat = rp100 / cat, 
+    across(c(cat, rp100), list(pct = ~./sum(.)))
+    ) |> 
+  arrange(nlcd_class) |> 
+  gt() |> 
+  fmt_number(c("cat","rp100"), decimals = 0) |> 
+  fmt_percent(contains("pct"), decimals = 1) |> 
+  data_color(palette = pal_nlcd)
+
+```
+
+
+```{r ggstatewide_urb_tree}
+{ 
+ggplot() +
+  geom_sf(data = sf_flw_catrp100_2001, aes(color = urbmdcatrp100+urbhicatrp100)) +
+  scale_color_gradient(low = "lightblue", high = "grey20") +
+  labs(subtitle = "2001") + theme_minimal()
+}+{
+ggplot() +
+  geom_sf(data = sf_cat_cat_2001, aes(fill = conifcat+decidcat+mxfstcat), color = NA) +
+  scale_fill_gradient(low = "grey90", high = "darkgreen") +
+  labs(subtitle = "2001") + theme_minimal()
+} + plot_layout(ncol = 1)
+
+```
+
+```{r}
+sc_nlcd_2001
+
+```
+
 -describe 2001: maps, distributions, tables
   - rp100 vs cat
 -describe 2001-2019 change
@@ -486,6 +255,13 @@ sf_cat <- readRDS(file.path(dir_data_common, "NHDPlus17/sf_nhdp_wa_cat.rds"))
   - other nlcd_class changes: mix of tree loss and other class shifts
     - focus on rp100?
 
+# Citations
+
+Hill, Ryan A., Marc H. Weber, Scott G. Leibowitz, Anthony R. Olsen, and Darren J. Thornbrugh, 2016. The Stream-Catchment (StreamCat) Dataset: A Database of Watershed Metrics for the Conterminous United States. Journal of the American Water Resources Association (JAWRA) 52:120-128. DOI: 10.1111/1752-1688.12372.
+
+Weber M (2025). _StreamCatTools: Tools to Work with the StreamCat API Within R and Access the Full Suite of StreamCat and LakeCat Metrics_. R package version 0.6.0, commit d8a8cce142e7cb9e3666a2660a8315a1766e5981, <https://github.com/USEPA/StreamCatTools>.
+
+:::
 
 ```{r streamcat_nlcd_overall_LUclass_EDA}
 ## overall spatial patterns of streamcat NLCD classes
@@ -605,36 +381,7 @@ sc_nlcd_cat_ac_year_wria |>
 #orig questions: what's the deficit and how's it changing?
 #"how well is washington's land use regulatory regime working to direct loss of natural cover away from a riparian corridor?"
 
-#starting object with cat and catrp100
-sc_nlcd_cat <- readRDS(file.path(dir_data_common, "streamcat", "sc_wa_nlcd.rds")) |> 
-  map(
-    ~.x |> 
-      rename_with(~str_remove(.,paste(c(2001, 2004, 2006, 2008, 2011, 2013, 2016, 2019),collapse = "|")) |> 
-                    str_remove("pct")) |> 
-      select(comid, nlcd_year, catareasqkm, catareasqkmrp100, ends_with("cat"), ends_with("catrp100"))
-      ) |> 
-  list_rbind() |> 
-  inner_join(
-    as_tibble(sf_cat) |> select(comid, wria, wria_nr_nm), by = "comid"
-  )
 
-#treed riparian area: what about 'wdwet'?
-#urblo and urbop are doing different things
-sc_nlcd_cat_ac <- sc_nlcd_cat |> 
-  #filter(is.na(urbmdcatrp100)) |> distinct(comid)
-  drop_na(urbmdcatrp100) |> #single lu class captures all 231 comids NA for rp100 vals
-  mutate(
-    across(c(ends_with("cat"), ends_with("catrp100")), ~./100)
-    ,
-    tree_cat = conifcat + decidcat + mxfstcat,
-    tree_catrp100 = conifcatrp100 + decidcatrp100 + mxfstcatrp100,
-    
-    urb_cat = urbhicat + urbmdcat,
-    urb_catrp100 = urbhicatrp100 + urbmdcatrp100,
-
-    across(ends_with("cat"), list(ac = ~.* catareasqkm * 247.11)),
-    across(ends_with("catrp100"), list(ac = ~.* catareasqkmrp100 * 247.11))
-    ) 
 
 ### pct-based viz
 #ignoring years, per-wria distrib pct-tree
@@ -842,8 +589,6 @@ comid_2019_urb_rp100 <- sc_nlcd_cat_ac |>
   filter(nlcd_year == 2019, (urbmdcatrp100 + urbhicatrp100 > 0)) |> 
   pull(comid)
 
-#going fast, just presumes nlcd_class sorted alphabetically
-pal_nlcd <- c("brown","darkgreen","yellow","green","yellowgreen","yellow","seagreen","green","blue","tan","grey10","grey30","grey60","grey80","seagreen")
 
 sc_nlcd_cat_ac |> 
   filter(nlcd_year %in% c(2001, 2019), comid %in% comid_2019_urb_rp100) |> 
@@ -1276,7 +1021,7 @@ tree_dtot |>
 
 ```
 
-```{r}
+```{r sc_wa_bfw, eval=FALSE}
 sc_wa_bfw <- StreamCatTools::sc_get_data(
   state = "WA",
   metric = 'bankfullwidth', aoi = 'other'
@@ -1292,6 +1037,5 @@ sf_flw |>
   ggplot() + geom_sf(aes(linewidth = bankfullwidth), color = "blue")
 
 ```
-
 
 :::
