@@ -30,12 +30,13 @@ epsg <- 2927 #WA state standard; NAD83(HARN)/ft
 
 # Introduction
 
-The term 'riparian' designates where streams and rivers meet and mingle with uplands. As with other ecological edges, this meeting place is host to many mutually enriching physical and biological exchanges. These hydro-geo-eco interactions are understood to provide numerous 'services' of value to people, leading to laws and policies seeking to protect more intact riparian areas and rehabilitate their degradation.
+'Riparian' designates where streams and rivers meet and mingle with uplands. As with other ecological edges, this meeting place is host to many mutually enriching physical and biological exchanges. These hydro-geo-eco interactions are understood to provide numerous services of value to people, leading to laws and policies seeking to protect more intact riparian areas and rehabilitate their degradation.
 
 In Washington state, within the federal statutory context of the Clean Water Act, Endangered Species Act, and various others, the 'realized riparian regulatory regime' emerges from several land use frameworks including the Shoreline Management Act, the Forest Practices Act, and the Growth Management Act.
 
 [...]
-https://ofm.wa.gov/sites/default/files/public/publications/RiparianTaskforcePreliminaryRecommendationsMay2024.pdf
+- V1 and V2 text and refs from earlier scripts
+- [task force recs](https://ofm.wa.gov/sites/default/files/public/publications/RiparianTaskforcePreliminaryRecommendationsMay2024.pdf)
 [...]
 
 This analysis offers a landscape-scale perspective on conditions and changes within a simple, spatially-defined riparian corridor, using readily-available datasets to examine broad patterns that span numerous jurisdictions as well as substantial hydroclimate and habitat variation. A primary focus is on "urban" cover as an indicator of imperviousness. Impervious cover has statewide relevance in mesic (western) and semi-arid (eastern) regions, and is well-understood to be associated with ecohydrologic degradation.
@@ -43,7 +44,9 @@ This analysis offers a landscape-scale perspective on conditions and changes wit
 
 # Data & methods 
 
-The [`StreamCatTools`](https://github.com/USEPA/StreamCatTools) (Weber 2025) R package was used to access the [StreamCat dataset](https://www.epa.gov/national-aquatic-resource-surveys/streamcat-dataset) (Hill et al. 2016), which delivers consistently geoprocessed attribute values for each reach unit of the original medium resolution NHDPlus hydrography (derived from a 30m DEM and sometimes termed "1:100K"; this is the precursor to subsequent continental elevation derived hydrographic datasets NHDPlusHR from 10m DEM and 3DHP from LiDAR). For each reach 'comid', attribute values from many raster and rasterized datasets are calculated within the local contributing catchment ('`cat`') as well as a 100m riparian buffer ('`rp100`') on "stream lines and on-network NLCD water pixels". *Not yet using Ws/Wsrp100, but add description here if added below*
+The [`StreamCatTools`](https://github.com/USEPA/StreamCatTools) (Weber 2025) R package was used to access the [StreamCat dataset](https://www.epa.gov/national-aquatic-resource-surveys/streamcat-dataset) (Hill et al. 2016), which delivers consistently geoprocessed attribute values for each reach unit of the original medium resolution NHDPlus hydrography. Derived from a 30m DEM and sometimes termed "1:100K", this captures most substantial watercourses and is the precursor to subsequent higher-resolution continent-wide elevation derived hydrographic datasets that include many smaller channel units (i.e., NHDPlusHR from 10m DEM and 3DHP from LiDAR). For each reach 'comid', StreamCat provides attribute values from many raster and rasterized datasets that are processed within the local contributing catchment ('`cat`') as well as a 100m riparian buffer ('`rp100`') on "stream lines and on-network NLCD water pixels". 
+
+*Not yet using Ws/Wsrp100, but add description here if added below*
 
 ```{r objects_sf}
 sf_wrias <- sf::read_sf(file.path(dir_data_common, "WR_WAT_WRIA.gdb/")) |>
@@ -81,17 +84,17 @@ sf_cat <- readRDS(file.path(dir_data_common, "NHDPlus17/sf_nhdp_wa_cat.rds"))
 
 ```
 
-StreamCat includes values calculated from 8 cycles of the National Land Cover Dataset: 2001, 2004, 2006, 2008, 2011, 2013, 2016, and 2019. The NLCD consists of a raster based on random forest classification of satellite and other imagery sources [(Wickham et al. 2023)](https://www.tandfonline.com/doi/full/10.1080/15481603.2023.2181143) These represent the percentages of each of 16 land cover classes within each of the *cat* and *catrp100* areas of interest  (AOI), so that the sum across classes is 1 for each AOI (i.e., the *rp100* area is spatially nested, but `rp100` percentages are provided as distinct rather than proportional to the total *cat* area). Approximate acreages were back-calculated as
+StreamCat includes values calculated from 8 cycles of the National Land Cover Dataset: 2001, 2004, 2006, 2008, 2011, 2013, 2016, and 2019. The NLCD rasters are based on random forest classification of satellite and other imagery sources [(Wickham et al. 2023)](https://www.tandfonline.com/doi/full/10.1080/15481603.2023.2181143). The StreamCat values represent the percentages of each of 16 land cover classes within each of the *cat* and *catrp100* areas of interest  (AOI), so that the sum across classes is 1 for each AOI (i.e., the *rp100* area is spatially nested, but `rp100` percentages are provided as distinct rather than proportional to the total *cat* area). Approximate acreages were back-calculated simply as:
 
-$$ acres = pct_{nlcd-class} * areasqkm_{cat|catrp100} * 247.11$$.
+$$ acres = pct_{nlcd-class} * areasqkm_{cat|catrp100} * 247.11$$
 
-The StreamCat process and NLCD datasets have undergone thorough QAQC and been extensively reviewed since their initial development, resulting in their widespread use in various scientific studies (see Wickham et al 2023 for the most recent NLCD validation study). Nonetheless, as with any remote sensed empirical data, some error unavoidably persists, and several key caveats are important to note.
+The StreamCat process and NLCD datasets have undergone thorough QAQC and been extensively reviewed since their initial development, resulting in their widespread use in various scientific studies (see Wickham et al 2023 for the most recent NLCD validation study). Nonetheless, as with any remote sensed empirical data, errors persist, and several key caveats are important to note.
 
-  - The underlying hydrography flowlines and catchment polygon mesh have positional error; not all streams, drainage divides, and/or riparian buffer corridors are 'where they should be'.
-  - Within any particular NLCD year, substantial 'on the ground' real-world land cover variation can occur within the 30m pixel resolution, such that the single assigned land cover class is the dominant spectral signature (i.e., on the per-pixel scale, classification accuracy is more likely to increase with homogeneity of cover types). 
-  - Between different NLCD years, a change in NLCD class may be due to sudden, substantial activity (e.g., a clear cut; fallowing or crop rotation; a new parking lot); to gradual, accumulative shifts of the fine-scale mix of types within-pixel; or potentially to spurious imagery artifacts rather than ground-level change.
+  - The underlying hydrographic flowlines and associated catchment polygon mesh have positional error; not all streams, drainage divides, and/or riparian buffer corridors are 'where they should be'.
+  - Within any particular NLCD year, substantial ground level variation can occur within the 30m pixel resolution, such that the single cover class assigned to the pixel may poorly describe the actual heterogenity (stated differently, the per-pixel suitability of classification will tend to increase with homogeneity of cover types). 
+  - Between different NLCD years, a change in NLCD class may be due to sudden, substantial activity (e.g., a clear cut; fallowing or crop rotation; a new parking lot); to gradual, accumulative shifts of the fine-scale mix of types within-pixel; or potentially to spurious artifacts rather than any actual ground-level change.
 
-Accordingly, these data are a standardized, consistent means to investigate larger-scale, general or cumulative patterns. 
+Accordingly, these data are a standardized, consistent means to investigate larger-scale, general or cumulative patterns, and are not suited to inferring site specific processes or causes.
  
 ```{r objects_streamcat_nlcd}
 ## recall riparian buffers are 100m, per https://www.epa.gov/national-aquatic-resource-surveys/streamcat-dataset-readme 
@@ -169,36 +172,15 @@ wrias <- as.character(c(1,7,8,10,15, 28,32,37,45,57))
 
 ```
 
-urbop: <20% impv
-urbloL 20-50% impv
-urbmd: 50-79% impv
-urbhi: >80% impv
-
-*other/more*
-  - (eastern US, comparison against 1m^2 urban cover showed very good agreement overall, somewhat worse for riparian exclusively)
-    - https://www.usgs.gov/publications/accuracy-assessment-nlcd-2011-impervious-cover-data-chesapeake-bay-region-usa
-  - bring back sc_imperv?
-```{r pctimp_back, eval=F}
-"~/T/DFW-Team WDFW Watershed Synthesis - data_common/streamcat/ImperviousSurfacesRipBuf100_WA.csv"
-StreamCatTools::sc_get_data(
-  comid = "23989097", metric = "pctimp2001",
-  # state = "WA", year = .x,
-  aoi = 'cat,catrp100,ws,wsrp100',
-  showAreaSqKm = T
-  ) |>
-  rename_with(tolower) |> as_tibble()
-sc_nlcd_2001 |> filter(comid =="23989097")
-
-```
-
-
 # Results and Discussion 
 
 ## 2001 Baseline
 
-The spatial and proportional distributions of land cover classes in 2001 follow expectations, with more intense urban cover types concentrated in the western portion of the state, particularly in central Puget Sound, and isolated higher cover corresponding to Spokane, Yakima, and Vancouver. A sum of 'forest' cover types (conifer, deciduous, and mixed) captures the large areas of commercial, state, and national forest in the Olympics and Cascades as well as the eastern Blue Mountain and Colville regions.
+Cover classes are distributed spatially and proportionally as expected in 2001, with more intense urban cover types concentrated in the western portion of the state, particularly in central Puget Sound, and isolated high urban hotspots corresponding to Spokane, Yakima, and Vancouver. A sum of 'forest' cover types (conifer, deciduous, and mixed) captures the large areas of private, state, tribal, and national forest in the Olympics and Cascades as well as the eastern Blue Mountain and Colville regions.
 
 The conifer, shrub, crop, and grass classes make up the largest total areas, with the two lower intensity urban classes (`urbop` and `urblo`, at <20% impervious and <50% impervious respectively) each more extensive than the sum of the two higher intensity classes (`urbmd` and `urbhi`, at <80% and >80% impervious). The relative proportions of the total areas within each AOI are similar across most classes, but the herbaceous and wooded wetland types (`hbwet` and `wdwet`) are relatively more prevalent in the `rp100` riparian corridor, while the higher intensity urban types are slightly less so.
+
+The total area of the `rp100` extent makes up approximately 14.8% of the total 43.3mil acres included in these data, and almost all WRIAs fall within a range of 10-20% for 'riparian corridor / total local catchment area'.
 
 ```{r sc_nlcd_2001}
 #single year, all attrib both AOI
@@ -245,28 +227,53 @@ sc_nlcd_2001 |>
 #recall these acreages are still nested: 
 #catareasqkm includes catareasqkmrp100
   mutate(
+    d_cat_rp100 = cat - rp100,
     rp100_pct_cat = rp100 / cat, 
     across(c(cat, rp100), list(pct_tot = ~./sum(.)))
     ) |> 
   arrange(nlcd_class) |> 
   gt(caption = "2001 NLCD statewide total areas by LU class and AOI") |> 
-  fmt_number(c("cat","rp100"), decimals = 0) |> 
+  fmt_number(c("cat","rp100","d_cat_rp100"), decimals = 0) |> 
   fmt_percent(contains("pct"), decimals = 1) |> 
   data_color(
     columns = "nlcd_class",
     palette = pal_nlcd
     ) |> 
-  grand_summary_rows(columns = c("cat","rp100"),fns = ~sum(.), fmt = ~fmt_number(., decimals = 0)) |> 
+  grand_summary_rows(columns = c("cat","rp100","d_cat_rp100"),fns = ~sum(.), fmt = ~fmt_number(., decimals = 0)) |> 
   tab_style(style = cell_borders(sides = "right"), locations = cells_body(columns = "rp100_pct_cat"))
 
 ```
 
-## Change since 2001
+```{r ggwria_rp100pctcat}
+d <- sf_wrias |> 
+  left_join(
+    sc_nlcd_2001 |> 
+      #summarise(across(contains("areasqkm"), sum)) |> 
+      summarise(across(contains("areasqkm"), sum), .by = wria_nr_nm) |> 
+      mutate(pct = catareasqkmrp100/catareasqkm) |> 
+      arrange(pct),
+    by = "wria_nr_nm"
+  ) 
 
-*this is now deducting rp100_ac from cat_ac, but need to *
-Aggregating to statewide totals, the higher intensity urban cover classes ... within ... local catchments and the `rp100` 100m riparian corridor. 
+{
+ggplot(as_tibble(d), aes(pct)) + geom_boxplot(outliers = F) + 
+  geom_jitter(aes(y = 0, size = catareasqkmrp100), position = position_jitter(height = 0.3), alpha = 0.5, show.legend = F) +
+  scale_x_continuous(labels = scales::percent, limits = c(0, 0.2)) +
+    scale_size_area() +
+  labs(
+    title = "Area of 'rp100' as percentage of total 'cat' area", x = NULL, y = NULL,
+    subtitle = "Points scaled to rp100 area") +
+    theme(axis.text.y = element_blank())
+  }/{
+ggplot(d) + geom_sf(aes(fill = pct)) +
+  scale_fill_continuous(labels = scales::percent) +
+  labs(fill = "(rp100/cat)%")
+} + plot_layout(heights = c(1,3)/5)
+```
 
-- abs areas smaller in rp100 but appear to be roughly similar rates, proportional to overall area; earlier simple bar plot was misleading due to abs-area y-axis scale, this view suggests no appreciably lower urb increase within rp100
+## Patterns since 2001
+
+Aggregating to statewide totals, higher intensity urban cover has steadily increased within both local catchments and the `rp100` 100m riparian corridor at similar rates since 2001. Annualizing from a basic OLS fit of $$ acres_{urban} \sim year_{NLCD} $$, suggests that, on average, approximately 179 and 655 acres per year of high and medium intensity urban cover have been added within 100m of WA watercourses. Not all of this increase is necessarily due to losses of natural vegetation cover, though, in conjunction with the 95 acre/year increase in the "low" class, these increases substantially exceed the 264 ac/y decrease in urban "open".
 
 ```{r ggstatewide_ac_urb_nlcd_year}
 sc_nlcd |> 
@@ -288,6 +295,7 @@ sc_nlcd |>
   mutate(d_cat_rp100 = cat - rp100) |> 
   pivot_longer(c(cat, rp100, d_cat_rp100), names_to = "aoi", values_to = "ac") |> 
   filter(aoi != "cat") |> 
+##confirming ggpmisc values
   #filter(nlcd_class=="urbhi", aoi =="rp100") -> d; lm(ac~nlcd_year, d) -> d; broom::tidy(d); rm(d)
   split(~nlcd_class) |> 
   map(
@@ -321,10 +329,12 @@ sc_nlcd |>
 
 ```
 
-however, considerable variation among and within wrias is evident in the relative urban cover increases...
+However, considerable variation among WRIAs is evident in the overall magnitude and relative rates of higher intensity urban cover change within the riparian corridor relative to the encompassing local catchment area.
 
 ```{r ggwria_ac_urb_nlcd_year}
-sc_nlcd |> 
+#calc approx acres per-wria, per-aoi, per-urban-class, per-year
+#then estimate annual acres change rp100 per annual acre change outside rp100 (d_cat_rp100) 
+d <- sc_nlcd |> 
   summarise(
     across(
       contains("urb") & ends_with("ac"),
@@ -338,47 +348,186 @@ sc_nlcd |>
     aoi = if_else(str_detect(name, "rp100"), "rp100", "cat"),
     nlcd_class = str_remove(name, "cat") |> str_remove("rp100") |> str_remove("_ac_sum"),
     name = NULL
-    ) |> 
-    pivot_wider(names_from = aoi, values_from = ac) |> 
+  ) |> 
+  pivot_wider(names_from = aoi, values_from = ac) |> 
   mutate(d_cat_rp100 = cat - rp100) |> 
   pivot_longer(c(cat, rp100, d_cat_rp100), names_to = "aoi", values_to = "ac") |> 
-  arrange(wria, aoi, nlcd_year) |> 
-  filter(aoi != "cat") |> 
-
-  #filter(nlcd_class=="urbhi", aoi =="rp100") -> d; lm(ac~nlcd_year, d) -> d; broom::tidy(d); rm(d)
-  filter(wria %in% wrias) |> 
-  filter(wria %in% c("1","57")) |> 
-  filter(nlcd_class == "urbhi") |> 
-  split(~nlcd_class) |> 
-  map(
-    ~.x |> 
-      ggplot(aes(nlcd_year, ac, fill = nlcd_class)) +
-      geom_col(show.legend = F) +
-      ggpmisc::stat_poly_line(color = "blue", se = T, show.legend = F) +
-      ggpmisc::stat_fit_tidy(
-        method = "lm",
-        label.x = "right", label.y = "top", vjust = -0.7,
-        method.args = list(formula = y ~ x),
-        mapping = aes(
-          label = sprintf(
-            "est. slope = %.0f ac/yr", #"Slope = %.3g\np-value = %.3g",
-            after_stat(x_estimate)#, after_stat(x_p.value)
-            )
-          ),
-        color = "blue"
-      ) +
-      coord_cartesian(clip = "off") +
-      scale_fill_manual(values = pal_nlcd[grep(unique(.x$nlcd_class), names(pal_nlcd))]) + 
-      scale_y_continuous(labels = scales::comma) +
-      facet_wrap(~wria+aoi, ncol = 2, labeller = label_wrap_gen(multi_line = F), strip.position = "top", scales = "free") +
-        labs(y = paste("acres", unique(.x$nlcd_class)), subtitle = unique(.x$nlcd_class)) +
-      theme(strip.text = element_text(hjust = 0.1))
+  arrange(wria, aoi, nlcd_class, nlcd_year) |> 
+  nest(.by = c(wria, wria_nr_nm, aoi, nlcd_class)) |> 
+  mutate(
+    lm_ac_y = map(data, ~lm(ac ~ nlcd_year, data = .x)),
+    lm_ac_y_est = map_dbl(lm_ac_y, ~broom::tidy(.x) |> filter(term=="nlcd_year") |> pluck("estimate")),
+    ac_2001 = map_dbl(data, ~filter(.x, nlcd_year==2001) |> pluck("ac"))
   ) |> 
-  wrap_plots(ncol = 1, guides = "collect")
+  select(wria, wria_nr_nm, aoi, nlcd_class, ac_2001, lm_ac_y_est) |> 
+  pivot_wider(names_from = aoi, values_from = c(ac_2001, lm_ac_y_est))
+
+g <- d |> 
+  filter(str_detect(nlcd_class, "hi|md")) |> 
+  ggplot(aes(label = wria_nr_nm)) +
+  # geom_col(aes(lm_ac_y_est_d_cat_rp100, fct_reorder(wria_nr_nm, lm_ac_y_est_d_cat_rp100, min))) +
+  # geom_col(aes(lm_ac_y_est_rp100, fct_reorder(wria_nr_nm, lm_ac_y_est_d_cat_rp100, min)), alpha = 0.5, fill = "red") +
+  geom_point(aes(lm_ac_y_est_d_cat_rp100, lm_ac_y_est_rp100,
+                 color = nlcd_class, size = ac_2001_rp100), 
+             show.legend = F) +
+  scale_color_manual(values = pal_nlcd[grep("urb", names(pal_nlcd))]) +
+  scale_size_area() +
+  facet_wrap(~nlcd_class, ncol = 1, scales = "free") +
+  labs(
+    title = "Estimated annual change in urban cover within vs outside rp100 corridor",
+    subtitle = "Point size scaled to 2001 acres of cover in rp100",
+    x = "Est. ac/year outside rp100",
+    y = "Est. ac/year within rp100"
+  )
+
+plotly::ggplotly(g)
+```
+
+```{r ggwria_ac_urb_nlcd_year_sf}
+#the ratio alone is sensitive to small denominators and mostly highlights locations with less cat-wide urb
+d <- sf_wrias |> 
+  left_join(
+    d |> 
+      filter(str_detect(nlcd_class, "hi|md")) |> 
+      mutate(
+        ac_y_rp100_per_d_cat = lm_ac_y_est_rp100 / lm_ac_y_est_d_cat_rp100
+        #across(c(lm_ac_y_est_rp100, lm_ac_y_est_d_cat_rp100), list(per = ~. / lm_ac_y_est_d_cat_rp100))
+      ) |>  
+      arrange(desc(ac_y_rp100_per_d_cat))
+    , by = c("wria", "wria_nr_nm")
+  ) 
+
+{
+d |> 
+  ggplot() + 
+  geom_sf(aes(fill = lm_ac_y_est_d_cat_rp100)) +
+  wacolors::scale_fill_wa_c("vantage", midpoint = 100) +
+  facet_wrap(~nlcd_class, ncol = 1) +
+  labs(
+    subtitle = "Outside 100m riparian corridor",
+    fill = "est. ac/y"
+  )
+}+{
+d |> 
+  #filter(nlcd_class == "urbhi") |> 
+  ggplot() + 
+  #geom_sf(aes(fill = ac_y_rp100_per_d_cat)) +
+  geom_sf(aes(fill = lm_ac_y_est_rp100)) +
+  wacolors::scale_fill_wa_c("vantage", midpoint = 10) +
+  facet_wrap(~nlcd_class, ncol = 1) +
+  labs(
+    subtitle = "Within 100m riparian corridor",
+    fill = "est. ac/y"
+  )
+}+plot_layout(nrow = 1) + plot_annotation(title = "Estimated annual urban cover change 2001-2019")
+```
+
+
+
+# Citations
+
+Hill, Ryan A., Marc H. Weber, Scott G. Leibowitz, Anthony R. Olsen, and Darren J. Thornbrugh, 2016. The Stream-Catchment (StreamCat) Dataset: A Database of Watershed Metrics for the Conterminous United States. Journal of the American Water Resources Association (JAWRA) 52:120-128. DOI: 10.1111/1752-1688.12372.
+
+Weber M (2025). _StreamCatTools: Tools to Work with the StreamCat API Within R and Access the Full Suite of StreamCat and LakeCat Metrics_. R package version 0.6.0, commit d8a8cce142e7cb9e3666a2660a8315a1766e5981, <https://github.com/USEPA/StreamCatTools>.
+
+
+::: {.content-hidden when-format="html"}
+
+urbop: <20% impv
+urbloL 20-50% impv
+urbmd: 50-79% impv
+urbhi: >80% impv
+
+*other/more*
+  - (eastern US, comparison against 1m^2 urban cover showed very good agreement overall, somewhat worse for riparian exclusively)
+    - https://www.usgs.gov/publications/accuracy-assessment-nlcd-2011-impervious-cover-data-chesapeake-bay-region-usa
+  - bring back sc_imperv?
+```{r pctimp_back, include=FALSE, eval=F}
+"~/T/DFW-Team WDFW Watershed Synthesis - data_common/streamcat/ImperviousSurfacesRipBuf100_WA.csv"
+StreamCatTools::sc_get_data(
+  comid = "23989097", metric = "pctimp2001",
+  # state = "WA", year = .x,
+  aoi = 'cat,catrp100,ws,wsrp100',
+  showAreaSqKm = T
+  ) |>
+  rename_with(tolower) |> as_tibble()
+sc_nlcd_2001 |> filter(comid =="23989097")
+
+```
+  - add in sc_bfw?
+```{r sc_wa_bfw, eval=FALSE}
+sc_wa_bfw <- StreamCatTools::sc_get_data(
+  state = "WA",
+  metric = 'bankfullwidth', aoi = 'other'
+) |> 
+  mutate(comid = as.character(comid))
+
+#append to sf multilinestring of WA flowlines
+sf_flw <- sf_flw |> 
+  left_join(sc_wa_bfw, by = "comid")
+
+sf_flw |> 
+  drop_na(bankfullwidth) |> 
+  ggplot() + geom_sf(aes(linewidth = bankfullwidth), color = "blue")
 
 ```
 
-```{r starting_refactor_arrowswarm}
+
+```{r qaqc, include=F, eval=FALSE}
+#wria 12 is basically just the cities between JBLM and Tacoma, small mostly built or already protected
+x<-filter(sf_flw, wria=="12"); y<-filter(sf_cat, wria=="12"); mapview::mapview(x)+mapview::mapview(y)
+
+
+#digging into a high ratio of rp100/d_cat_rp100
+#illustrates sensitivity to small d_cat_rp100 as well as potential processing artifacts
+g <- sf_cat |> 
+  filter(wria=="16") |> 
+  left_join(
+    sc_nlcd |> 
+      filter(wria=="16") |> #to speed up following operations
+      select(comid, nlcd_year, contains("rp100_ac") & contains("urbhi")) |> 
+      pivot_longer(cols = -c(comid, nlcd_year), values_to = "ac") |> 
+      mutate(
+        aoi = if_else(str_detect(name, "rp100"), "rp100", "cat"),
+        nlcd_class = str_remove(name, "cat") |> str_remove("rp100") |> str_remove("_ac"),
+        name = NULL
+        , nlcd_year = factor(nlcd_year)
+      )
+    ,
+    by = "comid"
+  ) |> 
+  ggplot() +
+  geom_sf(aes(fill = ac), color = "grey90", linewidth = 0.1) +
+  #scale_fill_gradient(low = "white", high = "grey10") +
+  wacolors::scale_fill_wa_c("vantage") +
+  #facet_wrap(~nlcd_year, nrow = 2) +
+  labs(subtitle = "High intensity urban cover in rp100") 
+
+gganimate::animate(
+  g + 
+    #gganimate::transition_time(nlcd_year) +
+    gganimate::transition_states(nlcd_year) +
+    gganimate::ease_aes() +
+    gganimate::enter_fade() +
+    #labs(title = 'year: {frame_time}')
+    labs(title = 'year: {closest_state}')
+  , nframes = 2*8, fps = 1, 
+  renderer = gifski_renderer()
+)
+
+x<-filter(sf_flw, wria=="16"); y <- filter(sf_cat, wria=="16"); mapview::mapview(x)+mapview::mapview(y)
+sc_nlcd |> 
+  # #the large ONF poly "24287056" looks artifactual; hard to see even 1.8ac of 'mostly impervious' cover other than river gravel
+  # filter(comid == "24287056") |> 
+  # whereas the Brinnon comid going from 2.7 to 4.5 ac mostly imperv within 100m is quite plausible
+  filter(comid == "24286928") |> 
+  select(nlcd_year, contains("urb") & contains("hi"))
+
+
+
+```
+
+```{r starting_refactor_arrowswarm, eval=FALSE}
 
 #steeper/more vertical indicates greater riparian increase than encompassing
 #versus flatter for surrounding increases without riparian
@@ -509,9 +658,8 @@ d |>
 
 ```
 
-
 not usable as is, and likely not helpful due to summing over per-comid different +/- change within wria AND even with free scale hard to see smaller wria vs larger wria diffs
-```{r perwria_sum_d1901_col_by_nlcd_class}
+```{r perwria_sum_d1901_col_by_nlcd_class, eval=FALSE}
 sc_nlcd |> 
   filter(nlcd_year %in% c(2001, 2019)) |> 
   select(wria, wria_nr_nm, nlcd_year, comid, contains("_ac"), -contains("urb_")) |> 
@@ -536,22 +684,8 @@ sc_nlcd |>
 ```
 
 
--describe 2001-2019 change
-  - urban increases
-    - rp100
-    - rp100 vs cat
-  - other nlcd_class changes: mix of tree loss and other class shifts
-    - focus on rp100?
-
-# Citations
-
-Hill, Ryan A., Marc H. Weber, Scott G. Leibowitz, Anthony R. Olsen, and Darren J. Thornbrugh, 2016. The Stream-Catchment (StreamCat) Dataset: A Database of Watershed Metrics for the Conterminous United States. Journal of the American Water Resources Association (JAWRA) 52:120-128. DOI: 10.1111/1752-1688.12372.
-
-Weber M (2025). _StreamCatTools: Tools to Work with the StreamCat API Within R and Access the Full Suite of StreamCat and LakeCat Metrics_. R package version 0.6.0, commit d8a8cce142e7cb9e3666a2660a8315a1766e5981, <https://github.com/USEPA/StreamCatTools>.
-
-:::
-
-```{r streamcat_nlcd_overall_LUclass_EDA}
+delete soon...
+```{r streamcat_nlcd_overall_LUclass_EDA, eval=FALSE}
 ## overall spatial patterns of streamcat NLCD classes
 ## parsing to determine whether/how to drop and/or aggregate classes
 
@@ -962,7 +1096,7 @@ d |>
 
 ```
 
-```{r SUPERSEDED_BUT_WITH_USEFUL_RP100_cat_d_urb_then_tree}
+```{r SUPERSEDED_BUT_WITH_USEFUL_RP100_cat_d_urb_then_tree, eval=FALSE}
 #wrangle saved list by year to single tibble
 #strip year from colnames, and condensing categories: 
 #focus on urban 'high'+'medium', 4 tree categories 
@@ -1227,22 +1361,5 @@ ggplot() +
 
 ```
 
-
-```{r sc_wa_bfw, eval=FALSE}
-sc_wa_bfw <- StreamCatTools::sc_get_data(
-  state = "WA",
-  metric = 'bankfullwidth', aoi = 'other'
-) |> 
-  mutate(comid = as.character(comid))
-
-#append to sf multilinestring of WA flowlines
-sf_flw <- sf_flw |> 
-  left_join(sc_wa_bfw, by = "comid")
-
-sf_flw |> 
-  drop_na(bankfullwidth) |> 
-  ggplot() + geom_sf(aes(linewidth = bankfullwidth), color = "blue")
-
-```
 
 :::
