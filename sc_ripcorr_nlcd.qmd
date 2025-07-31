@@ -266,7 +266,7 @@ sc_nlcd_2001 |>
 
 ```
 
-```{r ggwria_rp100pctcat}
+```{r ggwria_rp100pctcat, fig.height=8}
 d <- sf_wrias |> 
   left_join(
     sc_nlcd_2001 |> 
@@ -295,7 +295,9 @@ ggplot(d) + geom_sf(aes(fill = pct)) +
 
 ## Patterns since 2001
 
-Aggregating to statewide totals, higher intensity urban cover has steadily increased within both local catchments and the `rp100` 100m riparian corridor at similar rates since 2001. Annualizing from a basic OLS fit of $$ acres_{urban} \sim year_{NLCD} $$, suggests that, on average, approximately 179 and 655 acres per year of high and medium intensity urban cover have been added within 100m of WA watercourses. Not all of this increase is necessarily due to losses of natural vegetation cover, though, in conjunction with the 95 acre/year increase in the "low" class, these increases substantially exceed the 264 ac/y decrease in urban "open".
+### Statewide 
+
+Aggregating to statewide totals, higher intensity urban cover has steadily increased within both local catchments and the 100m riparian corridor at similar rates since 2001. Annualizing from a basic OLS fit of $$ acres_{urban} \sim year_{NLCD} $$, suggests that, on average, approximately 179 and 655 acres per year of high and medium intensity urban cover have been added within 100m of WA watercourses. Not all of this increase is necessarily due to losses of natural vegetation cover. However, in conjunction with the 95 acre/year increase in the "low" class, these increases substantially exceed the 264 ac/y decrease in urban "open".
 
 ```{r ggstatewide_ac_urb_nlcd_year}
 sc_nlcd |> 
@@ -351,9 +353,11 @@ sc_nlcd |>
 
 ```
 
-However, considerable variation among WRIAs is evident in the overall magnitude and relative rates of higher intensity urban cover change within the riparian corridor relative to the encompassing local catchment area.
+### By county
 
-```{r ggwria_ac_urb_nlcd_year}
+Considerable variation among watersheds is evident in the overall magnitude and relative rates of urban cover change outside of and within the riparian corridor.
+
+```{r ggwria_ac_urb_nlcd_year, fig.height=6}
 #calc approx acres per-wria, per-aoi, per-urban-class, per-year
 #then estimate annual acres change rp100 per annual acre change outside rp100 (d_cat_rp100) 
 d <- sc_nlcd |> 
@@ -384,28 +388,25 @@ d <- sc_nlcd |>
   select(wria, wria_nr_nm, aoi, nlcd_class, ac_2001, lm_ac_y_est) |> 
   pivot_wider(names_from = aoi, values_from = c(ac_2001, lm_ac_y_est))
 
-g <- d |> 
-  filter(str_detect(nlcd_class, "hi|md")) |> 
-  ggplot(aes(label = wria_nr_nm)) +
-  # geom_col(aes(lm_ac_y_est_d_cat_rp100, fct_reorder(wria_nr_nm, lm_ac_y_est_d_cat_rp100, min))) +
-  # geom_col(aes(lm_ac_y_est_rp100, fct_reorder(wria_nr_nm, lm_ac_y_est_d_cat_rp100, min)), alpha = 0.5, fill = "red") +
-  geom_point(aes(lm_ac_y_est_d_cat_rp100, lm_ac_y_est_rp100,
-                 color = nlcd_class, size = ac_2001_rp100), 
-             show.legend = F) +
-  scale_color_manual(values = pal_nlcd[grep("urb", names(pal_nlcd))]) +
-  scale_size_area() +
-  facet_wrap(~nlcd_class, ncol = 1, scales = "free") +
-  labs(
-    title = "Estimated annual change in urban cover within vs outside rp100 corridor",
-    subtitle = "Point size scaled to 2001 acres of cover in rp100",
-    x = "Est. ac/year outside rp100",
-    y = "Est. ac/year within rp100"
-  )
+# g <- d |> 
+#   filter(str_detect(nlcd_class, "hi|md")) |> 
+#   ggplot(aes(label = wria_nr_nm)) +
+#   # geom_col(aes(lm_ac_y_est_d_cat_rp100, fct_reorder(wria_nr_nm, lm_ac_y_est_d_cat_rp100, min))) +
+#   # geom_col(aes(lm_ac_y_est_rp100, fct_reorder(wria_nr_nm, lm_ac_y_est_d_cat_rp100, min)), alpha = 0.5, fill = "red") +
+#   geom_point(aes(lm_ac_y_est_d_cat_rp100, lm_ac_y_est_rp100,
+#                  color = nlcd_class, size = ac_2001_rp100), 
+#              show.legend = F) +
+#   scale_color_manual(values = pal_nlcd[grep("urb", names(pal_nlcd))]) +
+#   scale_size_area() +
+#   facet_wrap(~nlcd_class, ncol = 1, scales = "free") +
+#   labs(
+#     title = "Estimated annual change in urban cover within vs outside rp100 corridor",
+#     subtitle = "Point size scaled to 2001 acres of cover in rp100",
+#     x = "Est. ac/year outside rp100",
+#     y = "Est. ac/year within rp100"
+#   )
+# plotly::ggplotly(g)
 
-plotly::ggplotly(g)
-```
-
-```{r ggwria_ac_urb_nlcd_year_sf}
 #the ratio alone is sensitive to small denominators and mostly highlights locations with less cat-wide urb
 d <- sf_wrias |> 
   left_join(
@@ -419,8 +420,20 @@ d <- sf_wrias |>
     , by = c("wria", "wria_nr_nm")
   ) 
 
+# {
+# d |> 
+#   ggplot() + 
+#   geom_sf(aes(fill = lm_ac_y_est_d_cat_rp100)) +
+#   wacolors::scale_fill_wa_c("vantage", midpoint = 100) +
+#   facet_wrap(~nlcd_class, ncol = 1) +
+#   labs(
+#     subtitle = "Outside 100m riparian corridor",
+#     fill = "est. ac/y"
+#   )
+# }
+
 {
-d |> 
+  d |> 
   ggplot() + 
   geom_sf(aes(fill = lm_ac_y_est_d_cat_rp100)) +
   wacolors::scale_fill_wa_c("vantage", midpoint = 100) +
@@ -428,7 +441,7 @@ d |>
   labs(
     subtitle = "Outside 100m riparian corridor",
     fill = "est. ac/y"
-  )
+  ) + theme_minimal() + theme(axis.text = element_blank())
 }+{
 d |> 
   #filter(nlcd_class == "urbhi") |> 
@@ -440,8 +453,119 @@ d |>
   labs(
     subtitle = "Within 100m riparian corridor",
     fill = "est. ac/y"
+  ) + theme_minimal() + theme(axis.text = element_blank())
+} + 
+  plot_layout(nrow = 1) + 
+  plot_annotation(title = "Estimated annual urban cover change 2001-2019")
+```
+
+Stratification by county organizes some of this spatial variation in NLCD urban cover classes by a relevant jurisdictional unit.
+
+```{r sc_nlcd_ac_y_cnty}
+#calc approx acres per-wria, per-aoi, per-urban-class, per-year
+#then estimate annual acres change rp100 per annual acre change outside rp100 (d_cat_rp100) 
+sc_nlcd_ac_y_cnty <- sc_nlcd |> 
+  summarise(
+    across(
+      contains("urb") & ends_with("ac"),
+      list(sum = ~sum(.))
+    )
+    , .by = c(cnty, nlcd_year)
+  ) |> 
+  select(-contains("urb_")) |> 
+  pivot_longer(cols = -c(cnty, nlcd_year), values_to = "ac") |> 
+  mutate(
+    aoi = if_else(str_detect(name, "rp100"), "rp100", "cat"),
+    nlcd_class = str_remove(name, "cat") |> str_remove("rp100") |> str_remove("_ac_sum"),
+    name = NULL
+  ) |> 
+  pivot_wider(names_from = aoi, values_from = ac) |> 
+  mutate(d_cat_rp100 = cat - rp100) |> 
+  pivot_longer(c(cat, rp100, d_cat_rp100), names_to = "aoi", values_to = "ac") |> 
+  arrange(cnty, aoi, nlcd_class, nlcd_year) 
+
+lm_nlcd_ac_y_cnty <- sc_nlcd_ac_y_cnty |> 
+  nest(.by = c(cnty, aoi, nlcd_class)) |> 
+  mutate(
+    lm_ac_y = map(data, ~lm(ac ~ nlcd_year, data = .x)),
+    lm_ac_y_est = map_dbl(lm_ac_y, ~broom::tidy(.x) |> filter(term=="nlcd_year") |> pluck("estimate")),
+    ac_2001 = map_dbl(data, ~filter(.x, nlcd_year==2001) |> pluck("ac"))
+  ) |> 
+  select(cnty, aoi, nlcd_class, ac_2001, lm_ac_y_est) |> 
+  pivot_wider(names_from = aoi, values_from = c(ac_2001, lm_ac_y_est))
+```
+
+Differences among counties are evident in both the overall magnitude and the relative rates between the riparian corridor values and those for the encompassing local catchment.
+
+Examining estimated acres by urban cover class within the `rp100` for several example counties illustrates changes among NLCD-years (fig column-series)
+
+```{r ggcnty_ac_y_urb_cols}
+#split|>map pattern for side by side aoi is visually overwhelming with change in time of multiple nlcd_class
+#focus first here on just rp100
+
+sc_nlcd_ac_y_cnty |> 
+  filter(
+    aoi == "rp100", 
+    #str_detect(nlcd_class, "hi|md")
+    str_detect(cnty, "akim|okane|hurst|nohom")
+  ) |> 
+  ggplot(aes(nlcd_year, ac, group = cnty, fill = nlcd_class)) +
+  geom_col(show.legend = F) +
+  scale_x_continuous(breaks = c(2001, 2004, 2006, 2008, 2011, 2013, 2016, 2019)) + #unique(sc_nlcd_ac_y_cnty$nlcd_year)
+  scale_y_continuous(labels = scales::comma) +
+  scale_fill_manual(values = pal_nlcd[grep("urb", names(pal_nlcd))]) +
+  facet_grid(rows = vars(cnty), cols = vars(nlcd_class), scales = "free_y") +
+  labs(
+    title = "Example counties showing rp100 acreage of NLCD urban classes",
+    subtitle = "Note differences in y-axis scale among counties",
+    x = NULL, y = "acres"
+    ) +
+  theme(axis.text = element_text(size = 7))
+
+```
+
+(fig boxplot of rp100 lm-est by nlcd-class)
+
+```{r ggcnty_ac_y_urb_box}
+lm_nlcd_ac_y_cnty |> 
+  ggplot(aes(lm_ac_y_est_rp100, nlcd_class, color = nlcd_class)) +
+  geom_vline(xintercept = 0, linewidth = 0.3) +
+  geom_boxplot(outliers = F, show.legend = F) +
+  geom_jitter(aes(size = ac_2001_rp100), position = position_jitter(height = 0.2), alpha = 0.5, show.legend = F) +
+  scale_size_area(max_size = 4) +
+  scale_color_manual(values = pal_nlcd[grep("urb", names(pal_nlcd))]) +
+  labs(
+    title = "Annual changes by county in NLCD urban classes within riparian corridor",
+    subtitle = "Sample distributions of linear estimate of rp100 acres ~ NLCD year",
+    x = "est. acres/year", y = NULL
   )
-}+plot_layout(nrow = 1) + plot_annotation(title = "Estimated annual urban cover change 2001-2019")
+
+```
+
+(fig scatter of rp100 lm-est ~ d_cat_rp100 lm_est)
+saturating curves --> higher ratios at lower abs outside values 
+notable scatter above linear inflections
+
+
+```{r ggcnty_ac_y_urb_scatter}
+g <- lm_nlcd_ac_y_cnty |> 
+  filter(str_detect(nlcd_class, "hi|md")) |> 
+  ggplot(aes(label = cnty, color = nlcd_class)) +
+  geom_point(aes(lm_ac_y_est_d_cat_rp100, lm_ac_y_est_rp100,
+                 size = ac_2001_rp100), 
+             show.legend = F) +
+  geom_smooth(aes(lm_ac_y_est_d_cat_rp100, lm_ac_y_est_rp100)) +
+  scale_color_manual(values = pal_nlcd[grep("urb", names(pal_nlcd))]) +
+  scale_size_area() +
+  facet_wrap(~nlcd_class, ncol = 1, scales = "free") +
+  labs(
+    title = "Estimated annual change in urban cover within vs outside rp100 corridor",
+    subtitle = "Point size scaled to 2001 acres of cover in rp100",
+    x = "Est. ac/year outside rp100",
+    y = "Est. ac/year within rp100"
+  )
+
+plotly::ggplotly(g)
 ```
 
 
