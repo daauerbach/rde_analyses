@@ -493,11 +493,12 @@ lm_nlcd_ac_y_cnty <- sc_nlcd_ac_y_cnty |>
   ) |> 
   select(cnty, aoi, nlcd_class, ac_2001, lm_ac_y_est) |> 
   pivot_wider(names_from = aoi, values_from = c(ac_2001, lm_ac_y_est))
+
 ```
 
 Differences among counties are evident in both the overall magnitude and the relative rates between the riparian corridor values and those for the encompassing local catchment.
 
-Examining estimated acres by urban cover class within the `rp100` for several example counties illustrates changes among NLCD-years (fig column-series)
+The estimated acres of each NLCD urban class within the `rp100` AOI of example counties illustrates how the two higher impervious cover classes (darker bars) are typically present at smaller extents but exhibit proportionally larger changes among NLCD-years (fig column-series).
 
 ```{r ggcnty_ac_y_urb_cols}
 #split|>map pattern for side by side aoi is visually overwhelming with change in time of multiple nlcd_class
@@ -524,28 +525,132 @@ sc_nlcd_ac_y_cnty |>
 
 ```
 
-(fig boxplot of rp100 lm-est by nlcd-class)
+Clicking individual county names in the legend will focus on only those traces.
 
-```{r ggcnty_ac_y_urb_box}
-lm_nlcd_ac_y_cnty |> 
-  ggplot(aes(lm_ac_y_est_rp100, nlcd_class, color = nlcd_class)) +
-  geom_vline(xintercept = 0, linewidth = 0.3) +
-  geom_boxplot(outliers = F, show.legend = F) +
-  geom_jitter(aes(size = ac_2001_rp100), position = position_jitter(height = 0.2), alpha = 0.5, show.legend = F) +
-  scale_size_area(max_size = 4) +
-  scale_color_manual(values = pal_nlcd[grep("urb", names(pal_nlcd))]) +
-  labs(
-    title = "Annual changes by county in NLCD urban classes within riparian corridor",
-    subtitle = "Sample distributions of linear estimate of rp100 acres ~ NLCD year",
-    x = "est. acres/year", y = NULL
+```{r plotly_ac_y_urb_lines_multi, include=FALSE, eval=FALSE}
+lapply(
+  sc_nlcd_ac_y_cnty |>
+    filter(aoi == "rp100") |>
+    split(~nlcd_class)
+  ,
+  \(x){
+    plotly::plot_ly(
+      data = x,
+      type = 'scatter', mode = 'markers+lines',
+      name = ~cnty, x = ~nlcd_year, y = ~ac,
+      color = ~nlcd_class, colors = pal_nlcd[grep("urb", names(pal_nlcd))]
+      # #generates a single 4 panel with per-panel names and without duplicated labels
+      # #but label on/off not shared across panels 
+      #showlegend = x$nlcd_class[1] == "urbhi"
+    ) |>
+      plotly::layout(
+        annotations = list(
+          x = 2001, y = 1.05*max(x$ac),
+          text = x$nlcd_class[1],
+          showarrow = FALSE
+        )
+      )
+  }
+) #|> plotly::subplot(nrows = 4)
+```
+
+```{r plotly_ac_y_urb_lines_hi}
+#single nlcd_class
+sc_nlcd_ac_y_cnty |>
+  filter(aoi == "rp100", nlcd_class == "urbhi") |>
+  plotly::plot_ly(
+    type = 'scatter', mode = 'markers+lines',
+      name = ~cnty, x = ~nlcd_year, y = ~ac,
+      color = ~nlcd_class, colors = pal_nlcd[grep("urb", names(pal_nlcd))]
+  ) |>
+  plotly::layout(
+    title = list(text = "Urbhi")
+  )
+
+```
+```{r plotly_ac_y_urb_lines_md}
+sc_nlcd_ac_y_cnty |>
+  filter(aoi == "rp100", nlcd_class == "urbmd") |>
+  plotly::plot_ly(
+    type = 'scatter', mode = 'markers+lines',
+      name = ~cnty, x = ~nlcd_year, y = ~ac,
+      color = ~nlcd_class, colors = pal_nlcd[grep("urb", names(pal_nlcd))]
+  ) |>
+  plotly::layout(
+    title = list(text = "Urbmd")
+  )
+
+```
+```{r plotly_ac_y_urb_lines_lo}
+#single nlcd_class
+sc_nlcd_ac_y_cnty |>
+  filter(aoi == "rp100", nlcd_class == "urblo") |>
+  plotly::plot_ly(
+    type = 'scatter', mode = 'markers+lines',
+      name = ~cnty, x = ~nlcd_year, y = ~ac,
+      color = ~nlcd_class, colors = pal_nlcd[grep("urb", names(pal_nlcd))]
+  ) |>
+  plotly::layout(
+    title = list(text = "Urblo")
+  )
+
+```
+```{r plotly_ac_y_urb_lines_op}
+#single nlcd_class
+sc_nlcd_ac_y_cnty |>
+  filter(aoi == "rp100", nlcd_class == "urbop") |>
+  plotly::plot_ly(
+    type = 'scatter', mode = 'markers+lines',
+      name = ~cnty, x = ~nlcd_year, y = ~ac,
+      color = ~nlcd_class, colors = pal_nlcd[grep("urb", names(pal_nlcd))]
+  ) |>
+  plotly::layout(
+    title = list(text = "Urbop")
   )
 
 ```
 
-(fig scatter of rp100 lm-est ~ d_cat_rp100 lm_est)
-saturating curves --> higher ratios at lower abs outside values 
-notable scatter above linear inflections
+Viewed as the linear regression estimate of per-year change, the medium and high classes show consistent increases (i.e., positive slope estimates) across counties, while the low and open classes show variation with some counties decreasing in these classes.
+(fig boxplot of rp100 lm-est by nlcd-class)
 
+```{r ggcnty_ac_y_urb_box}
+## if not html
+# lm_nlcd_ac_y_cnty |> 
+#   ggplot(aes(lm_ac_y_est_rp100, nlcd_class, color = nlcd_class)) +
+#   geom_vline(xintercept = 0, linewidth = 0.3) +
+#   geom_jitter(aes(size = ac_2001_rp100), position = position_jitter(height = 0.2), alpha = 0.5, show.legend = F) +
+#   geom_boxplot(outliers = F, show.legend = F) +
+#   scale_size_area(max_size = 4) +
+#   scale_color_manual(values = pal_nlcd[grep("urb", names(pal_nlcd))]) +
+#   labs(
+#     title = "Annual changes by county in NLCD urban classes within riparian corridor",
+#     subtitle = "Sample distributions of linear estimate of rp100 acres ~ NLCD year",
+#     x = "est. acres/year", y = NULL
+#   )
+
+lm_nlcd_ac_y_cnty |> 
+  mutate(nlcd_class = factor(nlcd_class)) |> 
+  plotly::plot_ly(
+        color = ~nlcd_class, colors = pal_nlcd[grep("urb", names(pal_nlcd))]
+  ) |> 
+  plotly::add_trace(
+    x = ~lm_ac_y_est_rp100, 
+    y = ~nlcd_class, 
+    type = "box", hoverinfo = 'name+x', showlegend = F
+  ) |> 
+  plotly::add_markers(
+    x = ~lm_ac_y_est_rp100,
+    y = ~nlcd_class, 
+    marker = list(size = 6),
+    hoverinfo = 'text', text = ~paste(cnty, round(lm_ac_y_est_rp100,3)),
+    showlegend = F
+  )
+
+```
+
+These shifts within the riparian corridor are informed by the trajectory of urban cover in the area of each local catchment outside of the `rp100` extent. Comparing the medium and high classes this way, the within-corridor increases show clear inflections at roughly 30ac/y and 100ac/y for medium and high respectively, as well as saturation with increasing outside-corridor increases. Notably, the considerable scatter in within-corridor values at a given outside-corridor indicates clear differences between counties in where urban cover increases may have been concentrated.
+
+(fig scatter of rp100 lm-est ~ d_cat_rp100 lm_est)
 
 ```{r ggcnty_ac_y_urb_scatter}
 g <- lm_nlcd_ac_y_cnty |> 
@@ -568,6 +673,85 @@ g <- lm_nlcd_ac_y_cnty |>
 plotly::ggplotly(g)
 ```
 
+As an example, focusing on the `urbhi` class, Thurston (~77ac/y) and Yakima (~72ac/y) counties exhibit similar increases in the area outside `rp100`, but the ~14ac/yr within the riparian corridor of the latter was roughly 7 times the ~2ac/y of the former. Within Yakima county, most of the riparian corridor 'urban high' increase appears to have occurred in the same local catchments that experienced appreciable non-`rp100` increase. In contrast, the Thurston county local catchment with the most urban increase outside of `rp100` had relatively little change within the corridor. However, at the aggregated county scale, the larger total `rp100` increase in Yakima county appears due to the more widespread occurrence of reaches with both larger and smaller increases. It is possible that some of these smaller increases may be related to data artifacts, perhaps related to the more arid conditions.
+
+But...compare Snohom and Spokane, which are reversed E/W-dry/wet and below/above avg for rp100~d_cat_rp100
+
+```{r ggcnty_ac_y_urb_sf_focal_cnty}
+d <- sc_nlcd |> 
+  filter(
+    str_detect(cnty, "hurst|akima")
+    ,
+    nlcd_year %in% c(2001, 2019)
+    ) |> 
+  #select(cnty, comid, nlcd_year, urbhicatrp100_ac) |> 
+  #pivot_wider(names_from = nlcd_year, values_from = urbhicatrp100_ac) |> 
+  #mutate(d = `2019`-`2001`) |> 
+
+  select(cnty, comid, nlcd_year, contains("urbhi") & contains("_ac")) |> 
+  mutate(
+    #trace cover class percentages can generate negative d_cat_rp100 at single comid scale (e.g., 23105084)
+    #so coerce rp100 down to cat value if greater
+    urbhicatrp100_ac = if_else(urbhicatrp100_ac > urbhicat_ac, urbhicat_ac, urbhicatrp100_ac),
+    urbhi_d_cat_rp100 = urbhicat_ac - urbhicatrp100_ac
+    , urbhicat_ac = NULL
+    ) |>  
+  #filter(urbhi_d_cat_rp100 < 0) |> arrange(desc(abs(urbhi_d_cat_rp100)))
+  pivot_wider(names_from = nlcd_year, values_from = contains("urbhi")) |> 
+  mutate(
+    d_rp100 = urbhicatrp100_ac_2019 - urbhicatrp100_ac_2001,
+    d_out = urbhi_d_cat_rp100_2019 - urbhi_d_cat_rp100_2001
+    ) |> 
+  filter(urbhi_d_cat_rp100_2019 > 0 | urbhicatrp100_ac_2019 > 0) |> 
+  arrange(d_out) |> 
+  #12 cases of very small negative diffs in d_out for 19-01, all with d_rp100 < 1
+  #could coerce to 0 but simpler to exclude
+  filter(d_out >= 0)
+
+d_sf_cat <- sf_cat |> 
+  select(-cnty) |> 
+  inner_join(d, by = "comid")
+
+d_sf_flw <- sf_flw |> 
+  select(-cnty) |> 
+  inner_join(d, by = "comid")
+
+{
+ggplot() +
+  geom_sf(data = d_sf_cat, aes(fill = d_out), color = "lightgrey", linewidth = 0.1) +
+  geom_sf(data = d_sf_flw, color = "lightblue", linewidth = 0.3) +
+  wacolors::scale_fill_wa_c("forest_fire", limits = c(0, max(d$d_out)*1.05), aesthetics = c("fill","color"), reverse = T) +
+  ggspatial::annotation_scale() +
+    labs(subtitle = "Outside rp100 corridor")
+}/{
+ggplot() +
+  geom_sf(data = d_sf_cat, color = "lightgrey", fill = "white", linewidth = 0.1) +
+  geom_sf(data = d_sf_flw, aes(fill = d_rp100, color = d_rp100)) +
+  wacolors::scale_fill_wa_c("forest_fire", limits = c(0, max(d$d_rp100)*1.05), aesthetics = c("fill","color"), reverse = T) +
+  ggspatial::annotation_scale() +
+    labs(subtitle = "Within rp100 corridor")
+}+
+  plot_layout(ncol = 1) |> 
+  plot_annotation(
+    title = "Estimated increase in acres NLCD urban high cover class", subtitle = "Thurston and Yakima counties"
+  )
+```
+
+these need work, among other problems xscales are deceptive, even when filtering >0 some values <<1 look like zeros
+
+```{r fig.height=6}
+{
+d |> 
+  filter(d_out > 0) |> 
+  ggplot() +
+  geom_histogram(aes(d_out, fill = cnty), position = position_dodge(width = 0.3))
+}+{
+d |> 
+  #filter(d_rp100 > 0) |> 
+  ggplot() +
+  geom_histogram(aes(d_rp100, fill = cnty), position = position_dodge(width = 0.3))
+}
+```
 
 
 # Citations
@@ -620,9 +804,12 @@ sf_flw |>
 
 
 ```{r qaqc, include=F, eval=FALSE}
+#trace cover class percentages can generate negative d_cat_rp100 at single comid scale
+x<-filter(sf_flw, comid=="23105084"); y<-filter(sf_cat, comid=="23105084"); mapview::mapview(x)+mapview::mapview(y)
+x<-filter(sf_flw, comid=="24422847"); y<-filter(sf_cat, comid=="24422847"); mapview::mapview(x)+mapview::mapview(y)
+
 #wria 12 is basically just the cities between JBLM and Tacoma, small mostly built or already protected
 x<-filter(sf_flw, wria=="12"); y<-filter(sf_cat, wria=="12"); mapview::mapview(x)+mapview::mapview(y)
-
 
 #digging into a high ratio of rp100/d_cat_rp100
 #illustrates sensitivity to small d_cat_rp100 as well as potential processing artifacts
