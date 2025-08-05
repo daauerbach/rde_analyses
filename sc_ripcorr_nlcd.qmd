@@ -2,6 +2,7 @@
 title: "Assessing Washington's Riparian Land Cover"
 author: "dan.auerbach@dfw.wa.gov"
 date: "`r Sys.Date()`"
+output-file: sc_ripcorr_nlcd.html
 format:
   html:
     embed-resources: true
@@ -37,8 +38,117 @@ load("sc_ripcorr_nlcd.RData")
 In Washington state, within the federal statutory context of the Clean Water Act, Endangered Species Act, and various others, the 'realized riparian regulatory regime' emerges from several land use frameworks including the Shoreline Management Act, the Forest Practices Act, and the Growth Management Act.
 
 [...]
+
 - V1 and V2 text and refs from earlier scripts
+
 - [task force recs](https://ofm.wa.gov/sites/default/files/public/publications/RiparianTaskforcePreliminaryRecommendationsMay2024.pdf)
+
+- Add county level population change numbers? fit: urb_ac_rp100 ~ year + pop + housing
+  - capture that per-person increases decreasing even as abs continues to increase? or just use bookend pop numbers
+
+
+via Ken M: [Danielle Lazarus MS thesis, adv Withey](https://collections.evergreen.edu/files/original/ba7eb58e31f36d4592dadb2e962112724ca53982.pdf)
+- nice intro, lit review; strong policy awareness; appreciate the 'positionality' statement
+- statewide, NLCD + CDL at 50/100/SPTH200; aggregated to 3 class dev/ag/natural
+- buffer creation looks similar to RDE tessellation (combo of line and poly NHD hydrography, also VSW); appear to have unioned individual segments before raster extracts/zonal stats
+- reclassed to woody/shrubherb/devhimd/devloop and then dev/ag/'potential riparian' (tables 3&4, p92 of pdf, p74 of doc)
+- table 7 lists buffer acreages by 'simple' & total classes; statewide SPTH of ~7.979m is > ~6.4m for rp100 estimate from 2001 despite tribal and openwater/ice exclusions, coincidence that '100ft' total ~6.139m (3.413W + 2.726E) is much closer?
+- table 16 has 2019-2001 SPTH statewide dev at +11770ac (-1172pub + 12936priv) as hi+md+lo+op, with table 18 having himd vs loop split but only as pct; rp100 calc is 11870 = 406476 - 394606 = (17954+59037+133425+196060) - (14831+47626+131655+200494)
+  - note table 18 devmh spth pct increases very similar across buffers (0.11%-0.13% west, 0.16%-0.17% east); assuming these are not pct change of pcts, but instead abs change of pcts, for rp100 I get ~0.226% (76991/6413939)-(62458/6413939)
+
+seems that wider rp100 on shorter/fewer stream miles (NHDplus) is in the ballpark of narrower spth on longer/more hydro network...at least for urban/dev classes where upper network fringe hydrographic diffs less determinative?
+```{r}
+sc_nlcd |> 
+  summarise(across(ends_with("rp100_ac"), sum), .by = nlcd_year) |> 
+  select(nlcd_year, contains("urb")) |> 
+  filter(nlcd_year %in% c(2001,2019)) |> 
+  pivot_longer(-nlcd_year) |> 
+  pivot_wider(names_from = nlcd_year) |> 
+  mutate(d = `2019`-`2001`)
+```
+
+
+
+via George W, intro to shoreline HRCD mscpt:
+Alberti, M., R. Weeks, and S. Coe. 2004. Urban land-cover change analysis in central Puget Sound. Photogrammetric Engineering & Remote Sensing 70:1043–1052
+
+Hepinstall-Cymerman, J., S. Coe, and L.R. Hutyra. 2013. Urban growth patterns and growth management boundaries in the central Puget Sound, Washington, 1986–2007. Urban Ecosystems 16:109–129.
+
+Kennedy, R.E., Z. Yang, J. Braaten, C. Copass, N. Antonova, C. Jordan, and P. Nelson. 2015. Attribution of disturbance change agent from Landsat time-series in support of habitat monitoring in the Puget Sound region, USA. Remote Sensing of Environment 166:271-285.
+
+
+Bartz, K. K., M. J. Ford, T. J. Beechie, K. L. Fresh, G. R. Pess, R. E. Kennedy, M. L. Rowse, and M. Sheer. 2015. Trends in developed land cover adjacent to habitat for threatened salmon in Puget Sound, Washington, U.S.A. PLoS One 10:1–22.
+  - Puget Sound only (and not Kitsap, HC, fair bit of JDF), LandTrendr Landsat 1986-2008
+  
+
+
+**GPT**
+
+[emailed]
+Me, curious what ChatGPT would offer, not because I necessarily expected it to be correct, but exactly because I was guessing it would help to reveal that it’s a harder problem than it feels like it should be. I was not prepared for just how nicely it frames the research:
+ 
+How much impervious surface has Washington state added to riparian zones in the 21st century, and how has that compared to the prior phase of industrialization during the 20th century?
+ 
+Unfortunately, I was unable to locate any peer‑reviewed or government-confirmed estimates quantifying how many acres (or square miles) of impervious surfaces have been added specifically within Washington State’s riparian zones in the 21st‑century versus the 20th century. The data simply haven’t—or at least not in a way readily accessible to search.
+🧾 What We Do Know
+1. Impervious surface growth in the Puget Sound region
+Since the 1990s, urban and suburban development around Puget Sound has driven a marked rise in impervious areas (roads, rooftops, parking lots), which substantially increase stormwater runoff and pollutant loads to rivers and streams—impacting salmon and other riparian-dependent species (Reddit).
+State strategies now aim to reduce impervious cover in key urban basins below 30% by 2031 through green infrastructure and depaving projects (Department of Natural Resources).
+2. Historical land-use transformation—20th century
+During the 20th century, riparian zones were heavily transformed through industrial and milling operations, channel straightening, logging roads, floodplain filling, and agricultural conversion—often without quantifying impervious cover per se, but drastically altering hydrology (e.g. North Creek at UW Bothell) (Wikipedia).
+Forestry practices concentrated riparian logging and road construction across river corridors—though the exact figure of impervious surface (gravel roads, skid trails) throughout the 1900s isn’t tracked quantitatively in published sources (Wikipedia).
+🔍 Comparison: Why quantitative figures are elusive
+Riparian buffer regulations evolved over time (e.g. WAC riparian management zones established by 1999) but did not mandate systematic tracking of impervious cover additions within those zones (app.leg.wa.gov).
+Impervious-surface monitoring typically occurs at watershed or basin scales—not isolated to riparian strips. Most urban stormwater studies focus on broader drainage areas.
+Earlier industrial-era records prioritized timber harvest volumes and land clearance, not area of paved or built surfaces along streambanks.
+🚦 Direction for more precise information
+If you're looking to obtain more exact figures, the following avenues might help:
+Washington Department of Ecology or regional stormwater monitoring reports that break impervious cover contributions by subbasin—perhaps isolating riparian margins.
+County or city-level GIS analyses, potentially available through King County, Snohomish, Pierce, or other land‑use planning departments.
+USGS or EPA studies that map changes in stream‑adjacent land cover between circa 2000 and present; these might allow you to extract riparian‑zone impervious share.
+✅ Bottom line summary
+There is no publicly available estimate quantifying the total added impervious surface area specifically within riparian zones of Washington State in the 21st century.
+Compared to the broader-scale industrialization and logging, channel modification, and floodplain filling of the 20th century, it's likely that the absolute impervious increase within riparian corridors in recent decades is smaller, but still environmentally significant due to urbanization and stormwater runoff impacts.
+Without targeted GIS or environmental modeling studies, a precise numerical comparison remains unavailable.
+If you’d like, I can help you identify specific agencies or datasets—or suggest how to commission a GIS analysis to fill this gap.
+
+
+via Ken M, same prompt to ScholarGPT:
+
+The expansion of impervious surfaces in Washington State's riparian zones over the 21st century has been a continuation and intensification of trends that began during the 20th-century industrialization phase. The 20th century saw rapid urbanization driven by industrial development, leading to significant increases in impervious surfaces such as roads, parking lots, and buildings, which fragmented riparian habitats and disrupted hydrological functions. In contrast, the 21st century has been characterized by sprawling suburban development, more advanced land-use practices, and regulatory interventions, though the cumulative impact of impervious surface area continues to grow.
+Key Findings from Research:
+
+Booth (2000) examined the correlation between forest cover, impervious surfaces, and urbanization impacts in King County, Washington. The study found that even small increases in impervious surfaces within riparian buffers led to measurable hydrological and ecological impacts, with urban sprawl post-1980s contributing significantly to these changes.
+
+Gregory et al. (1997) highlighted the transition of riparian management strategies from unregulated industrial expansion in the 20th century to more controlled urban growth with environmental considerations in the 21st century. However, these policies have struggled to halt cumulative impervious surface increases.
+
+Yeakley & Hughes (2013) in "Wild Salmonids in the Urbanizing Pacific Northwest" emphasized how urban expansion in riparian zones increased significantly from the 1980s to the present, affecting salmonid habitats. The impervious surface impact was more diffuse but still severe in the 21st century due to suburban sprawl patterns.
+
+Sweeney & Blaine (2007) pointed out that while 20th-century industrialization cleared riparian zones for agriculture and urban centers, the early 21st century has seen urbanization shift towards watershed-wide impacts with smaller but more widespread impervious additions.
+
+Hall & Hossain (2020) analyzed impervious surface growth through remote sensing, showing that riparian zones continue to lose pervious surfaces at alarming rates in urbanizing areas of Washington State, driven more by diffuse suburban and exurban development rather than concentrated industrial zones.
+
+Kaushal et al. (2015) described how urban evolution from the Industrial Revolution to present resulted in increasing decoupling of streams from their riparian buffers due to impervious surface growth. Washington State's riparian areas are no exception, facing "impervious encroachment" well into the 21st century.
+
+Ricker et al. (2012) documented historic land use shifts, illustrating that impervious surfaces began dramatically impacting riparian soil functions by mid-20th century, while the 21st century has seen a diversification in impervious encroachment patterns rather than outright expansion rates.
+
+Nayak (2023) focused on the Cedar River-Lake Washington watershed, reporting a measurable increase in impervious surface area within 54 identified riparian zones, noting that 21st-century growth is more nuanced due to zoning policies, yet significant enough to influence water quality and hydrology.
+
+Comparative Insight:
+20th Century Industrialization Phase: Characterized by aggressive land clearing for agriculture, timber, and heavy industrial operations, leading to direct and large-scale riparian buffer destruction.
+21st Century Urbanization: Expansion is less aggressive per unit area but more pervasive, leading to cumulative impacts over broader areas due to residential, infrastructural, and commercial suburban sprawl.
+Conclusion:
+While the scale and patterns of impervious surface expansion have shifted from concentrated industrial footprints in the 20th century to more distributed urban/suburban expansion in the 21st, the net effect has been a continued loss of riparian function and buffer integrity across Washington State. Despite improved regulatory frameworks, growth management efforts have only partially mitigated these trends.
+
+Booth, D.B., 2000. Forest cover, impervious-surface area, and the mitigation of urbanization impacts in King County, Washington. University of Washington ResearchWorks Archive. Available at: https://digital.lib.washington.edu/researchworks/bitstream/handle/1773/19552/Forest%20Cover.pdf?sequence=1 [Accessed 4 August 2025].
+Gregory, S.V., 1997. Riparian management in the 21st century. In: S.V. Gregory, ed. Streamside Management: Forestry and Fishery Interactions. Washington, DC: Island Press, pp.69–85. Available at: https://books.google.com/books?id=XNiq_KJ-zpgC&pg=PA69 [Accessed 4 August 2025].
+Yeakley, J.A. and Hughes, R.M., 2013. Global and regional context of salmonids and urban areas. In: J.A. Yeakley and R.M. Hughes, eds. Wild Salmonids in the Urbanizing Pacific Northwest. New York: Springer, pp.11–26. Available at: https://scholar.archive.org/work/hvsimbwx2nclvmgcpb7jhau2hu/access/wayback/http://www.springer.com/cda/content/document/cda_downloaddocument/9781461488170-c1.pdf?SGWID=0-0-45-1428008-p175373186 [Accessed 4 August 2025].
+Sweeney, B.W. and Blaine, J.G., 2007. Resurrecting the in-stream side of riparian forests. Journal of Contemporary Water Research & Education, 136(1), pp.17–27. Available at: https://nmwrri.nmsu.edu/footer_pages/nm-wrri-library-database-files/wrri-library-pdfs/wrrilibrary8/008783.pdf#page=21 [Accessed 4 August 2025].
+Hall, J. and Hossain, A.K.M.A., 2020. Mapping urbanization and evaluating its possible impacts on stream water quality in Chattanooga, Tennessee, using GIS and remote sensing. Sustainability, 12(5), p.1980. Available at: https://www.mdpi.com/2071-1050/12/5/1980 [Accessed 4 August 2025].
+Kaushal, S.S., McDowell, W.H., Wollheim, W.M., et al., 2015. Urban evolution: The role of water. Water, 7(8), pp.4063–4087. Available at: https://www.mdpi.com/2073-4441/7/8/4063 [Accessed 4 August 2025].
+Ricker, M.C., Donohue, S.W. and Stolt, M.H., 2012. Development and application of multi-proxy indices of land use change for riparian soils in southern New England, USA. Ecological Applications, 22(5), pp.1474–1491. Available at: https://www.researchgate.net/profile/Michael-Zavada-2/publication/225051164_Development_and_application_of_multi-proxy_indices_of_land_use_change_for_riparian_soils_in_southern_New_England_USA/links/5627ff9008ae518e347b3173/Development-and-application-of-multi-proxy-indices-of-land-use-change-for-riparian-soils-in-southern-New-England-USA.pdf [Accessed 4 August 2025].
+Nayak, S., 2023. Impact of Riparian Landscape Patterns on Water Quality in an Urbanizing River Basin: A Case of Cedar River-Lake Washington Watershed. Master's thesis. University of Washington. Available at: https://digital.lib.washington.edu/researchworks/bitstream/handle/1773/49961/Nayak_washington_0250O_23832.pdf?sequence=1 [Accessed 4 August 2025].
+
 [...]
 
 This analysis offers a landscape-scale perspective on conditions and changes within a simple, spatially-defined riparian corridor, using readily-available datasets to examine broad patterns that span numerous jurisdictions as well as substantial hydroclimate and habitat variation. A primary focus is on "urban" cover as an indicator of imperviousness. Impervious cover has statewide relevance in mesic (western) and semi-arid (eastern) regions, and is well-understood to be associated with ecohydrologic degradation.
@@ -298,6 +408,44 @@ ggplot(d) + geom_sf(aes(fill = pct)) +
 ### Statewide 
 
 Aggregating to statewide totals, higher intensity urban cover has steadily increased within both local catchments and the 100m riparian corridor at similar rates since 2001. Annualizing from a basic OLS fit of $$ acres_{urban} \sim year_{NLCD} $$, suggests that, on average, approximately 179 and 655 acres per year of high and medium intensity urban cover have been added within 100m of WA watercourses. Not all of this increase is necessarily due to losses of natural vegetation cover. However, in conjunction with the 95 acre/year increase in the "low" class, these increases substantially exceed the 264 ac/y decrease in urban "open".
+
+```{r sc_nlcd_2019}
+#single year, all attrib both AOI
+sc_nlcd_2019 <- sc_nlcd |> 
+  filter(nlcd_year==2019) 
+```
+
+```{r gt_2019_statewide_area_cat_rp100}
+sc_nlcd_2019 |> 
+  select(comid, contains("_ac"), -contains("urb_")) |> 
+  summarise(across(contains("_ac"), sum)) |> 
+  pivot_longer(contains("_ac")) |> 
+  mutate(
+    aoi = if_else(str_detect(name, "rp100"), "rp100", "cat"),
+    nlcd_class = str_remove(name, "cat") |> str_remove("rp100") |> str_remove("_ac"),
+    name = NULL
+    ) |> 
+  pivot_wider(names_from = aoi, values_from = value) |>
+#recall these acreages are still nested: 
+#catareasqkm includes catareasqkmrp100
+  mutate(
+    d_cat_rp100 = cat - rp100,
+    rp100_pct_cat = rp100 / cat, 
+    across(c(cat, rp100), list(pct_tot = ~./sum(.)))
+    ) |> 
+  arrange(nlcd_class) |> 
+  gt(caption = "2019 NLCD statewide total areas by LU class and AOI") |> 
+  fmt_number(c("cat","rp100","d_cat_rp100"), decimals = 0) |> 
+  fmt_percent(contains("pct"), decimals = 1) |> 
+  data_color(
+    columns = "nlcd_class",
+    palette = pal_nlcd
+    ) |> 
+  grand_summary_rows(columns = c("cat","rp100","d_cat_rp100"),fns = ~sum(.), fmt = ~fmt_number(., decimals = 0)) |> 
+  tab_style(style = cell_borders(sides = "right"), locations = cells_body(columns = "rp100_pct_cat"))
+
+```
+
 
 ```{r ggstatewide_ac_urb_nlcd_year}
 sc_nlcd |> 
