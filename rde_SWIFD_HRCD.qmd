@@ -76,6 +76,31 @@ This analysis broadens to a regional scale, quantifying patterns per-WRIA, based
 #   select(pid, everything(), -reach_id)
 # 
 # saveRDS(rch_tbl, "~/T/DFW-Team WDFW Watershed Synthesis - data_common/rde/wria_rch_tlb.rds")
+
+need to rebuild against: https://api-ripariandata.wdfw.wa.gov/
+samke key, confirmed 8/5/25 can read_csv for wrias
+could redo by counties via https://api-ripariandata.wdfw.wa.gov/counties/{countyName}/reaches/csv
+but wrias is more convenient to loop over numeric index
+
+walk(
+  1:3, #31:62, #1:62, 
+  
+  ~httr2::request(paste0(
+    # 'https://api-riparis.esa-prod.sitkatech.com/wrias/',.x,'/reaches/csv'
+    'https://api-ripariandata.wdfw.wa.gov/wrias/',.x,'/reaches/csv'
+  )) |> 
+    httr2::req_headers(
+      `x-api-key` = key
+    ) |> 
+    #httr2::req_dry_run()
+    httr2::req_perform() |> 
+    httr2::resp_body_raw() |> 
+    readr::read_csv() |> 
+    readr::write_csv(
+      file = file.path(dir_data_common, paste0("rde/wrias/rde_wria_",stringr::str_pad(.x, 2, pad = "0"), ".csv"))
+    )
+)
+
 ```
 
 A complete set of reach tables includes values for >1mil rows statewide, indexed by `pid` (permanent identifiers). In this structure, a `pid`-row can include a combination of "extent of observed water" (EOW), "floodplain" (primarily based on FEMA mapping), and riparian management zone (RMZ, both banks where double-banked) geometry. However, the results presented here are based on the area (acreage) associated with the RMZ and EOW "riparian corridor".

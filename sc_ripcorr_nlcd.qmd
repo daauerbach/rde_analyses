@@ -31,25 +31,87 @@ theme_set(theme_minimal())
 load("sc_ripcorr_nlcd.RData")
 ```
 
+[beginning to draft something that combines rde_SWIFD_HRCD analyses with sc_ripcorr_nlcd, 
+eventually probably a new file but keeping here for now]
+
 # Introduction
 
-'Riparian' designates where streams and rivers meet and mingle with uplands. As with other ecological edges, this meeting place is host to many mutually enriching physical and biological exchanges. These hydro-geo-eco interactions are understood to provide numerous services of value to people, leading to laws and policies seeking to protect more intact riparian areas and rehabilitate their degradation.
+'Riparian' designates where streams and rivers meet and mingle with uplands. As with other ecological edges, this meeting place is host to mutually enriching physical and biological exchanges. These land-water interactions provide numerous services of value to people, leading to laws and policies meant to protect and rehabilitate riparian areas.
 
-In Washington state, within the federal statutory context of the Clean Water Act, Endangered Species Act, and various others, the 'realized riparian regulatory regime' emerges from several land use frameworks including the Shoreline Management Act, the Forest Practices Act, and the Growth Management Act.
+In Washington state, within the context of U.S. treaties with sovereign tribes, the Clean Water Act, the Endangered Species Act, and other federal statutes, the 'realized regulatory regime' that affects riparian and shore areas emerges from multiple land use frameworks that include the Shoreline Management Act, the Forest Practices Act, and the Growth Management Act. Administrative responsibility is shared and often overlapping, and no single entity has statewide authority over riparian management or the location and size of 'riparian management zones' (RMZ) delineating the jurisdictional extent of decisions. 
+
+However, the Washington Department of Fish and Wildlife, under its mandate "to preserve, protect and perpetuate fish, wildlife and ecosystems while providing sustainable fish and wildlife recreational and commercial opportunities", has issued guidance on a statewide RMZ formulation that is grounded in available evidence of ecosystem functions. The [Site Potential Tree Height standard (SPTH)](https://wdfw.wa.gov/publications/02564) promulgated in WDFW management recommendations [(Rentz et al. 2020)](https://wdfw.wa.gov/publications/01988) follows from an extensive review and synthesis of scientific studies [(Quinn et al. 2020)](https://wdfw.wa.gov/publications/01987) that updated and extended earlier guidelines [(Knutson and Naef 1997)](https://wdfw.wa.gov/sites/default/files/publications/00029/wdfw00029.pdf). The premise that social, political, and economic values inform any answer to "how wide should an RMZ be" led to separation of the technical review and policy recommendations ([Wilhere and Quinn 2018](https://digitalrepository.unm.edu/nrj/vol58/iss2/13/), Chapman et al. 2020).
+
+Accordingly, the SPTH200 concept in the 2020 WDFW guidance - that the height of mature native trees characteristic of a location determines the RMZ lateral distance from water - is an attempt to accommodate the need for consistency and standardization in implementation while recognizing the inherent natural variation in geomorphic, hydrologic, and ecological conditions. In support of applying the SPTH200 standard more readily, the agency has subsequently developed a geospatial web application that "unites WDFW riparian datasets in Washington State...allow[ing] planners to evaluate the conditions of riparian ecosystems and make data-informed planning decisions". The foundation of this [Riparian Data Engine (RDE)](https://ripariandata.wdfw.wa.gov/) is a statewide polygon tessellation of RMZs generated from public hydrography (NHD) and soils (SSURGO) data. Various land cover, jurisdictional, water quality, and salmon distribution attributes have been calculated for each RMZ unit, enabling users to interactively examine a "reach table" consisting of individual RMZ rows. Filters and map-based exploration support interactive queries and comparison of summarized attribute values. For example, a user can rapidly filter for locations within a Water Resource Inventory Area (WRIA) or a county with a tree canopy cover proportion of interest (i.e., to target protection towards higher cover or rehabilitation towards lower cover). In addition, the RDE provides a means to quickly compare a single reach to the summarized attributes of its upstream and downstream "network neighborhoods". Such information can help to inform a range of conservation management decisions at the site scale.
+
+But despite the well-understood importance of riparian areas and the considerable attention devoted to their study in Washington and the western United States more broadly, considerable uncertainty still surrounds basic measures of riparian condition and change at the landscape scale. Notwithstanding the qualitative consensus that riparian ecosystems have experienced "substantial" or "dramatic" changes, quantitative estimates vary widely, and these differences may hinder effective communication or setting appropriate policy objectives. 
+
+This analysis therefore addresses the need for landscape scale quantification, with a primary focus on "urban" cover as an indicator of imperviousness. Impervious cover has statewide relevance in mesic (western) and semi-arid (eastern) regions, and is well-understood to be associated with ecohydrologic degradation. Specifically, we investigated the seemingly simple question "How much impervious surface has Washington state added to riparian zones in the 21st century, and how has that related to prior changes during the 20th century?"
+
+Past research has indicated likely patterns without providing a clear answer to this question. Jones et al. (2010) considered late 20th century land cover change (1973-2003) at relatively coarse spatial resolution (60m) within a 180m buffer of NHD watercourses in several thousand sample blocks across the continental United States. They described a nationwide monotonic increase in the average riparian "urban %" over the assessed duration, and their results showed the Puget lowlands region had the largest decrease in "natural land cover" during the "mid 80s - early 90s" period (relative both to its change in other time periods and to all other regions nationally in that period).
+
+Increased "urban" or impervious cover within Puget Sound was also described by Bartz et al. (2015) on the basis of annual LandTrendr-derived changes in 30m imagery within 100m or 200m buffers of geographic features distinguished as important salmon habitat. Within the assessed areas, they estimated that, by 2008, mainstem zones gained roughly 172ha (~425ac, 3%) of impervious cover from ~5820ha in 1986 and that tributary zones increased roughly 119ha (294ha, 5.5%) from ~2,153ha. However, they also reported evidence of a "flatter" rate of increase in urban cover across these and the other nearshore, estuary, and floodplain habitat areas examined, with the timing of inflections varying considerably among habitat types and subbasins. These authors were unequivocal that a legacy of degradation continues to affect Puget Sound habitats, but they also concluded that more recent changes in land cover may indicate slower growth in additional impairment, perhaps attributable to a combination of cultural, economic and regulatory factors.
+
+
+  - Folkerts et al 2020 mapping CAO project report?
+  - Lazarus 2023 thesis (different stratification: public-private, other exclusions)
+
+terms and defs: 
+ - rmz vs 'corridor', buffer etc.
+ - impervious, urban, developed
+
+
+...comparing the RDE with a simple, spatially-defined riparian corridor
+
+...using readily-available datasets to examine broad patterns that span numerous jurisdictions as well as substantial hydroclimate and habitat variation. 
+
+
 
 [...]
-
-- V1 and V2 text and refs from earlier scripts
 
 - [task force recs](https://ofm.wa.gov/sites/default/files/public/publications/RiparianTaskforcePreliminaryRecommendationsMay2024.pdf)
 
 - Add county level population change numbers? fit: urb_ac_rp100 ~ year + pop + housing
   - capture that per-person increases decreasing even as abs continues to increase? or just use bookend pop numbers
 
+- Do we know any locations with unambiguous ground level de-paving/removal of impervious surface?
+```{r elwha_reservoir_in_nlcd}
+x<-filter(sf_flw, wria=="18"); y<-filter(sf_cat, wria=="18"); mapview::mapview(x)+mapview::mapview(y)
+#lower dam and resvr: "23997060"
+#upper mid resvr, could include several other lines: "23997114"
+
+x<-filter(sf_flw, comid=="23997114") |> st_buffer(dist = 300)
+y<-filter(sf_cat, comid=="23997114")
+mapview::mapview(x)+mapview::mapview(y)
+#yep. very nice. 
+sc_nlcd |> 
+  filter(comid=="23997114") |> 
+  select(wria_nr_nm, cnty, comid, nlcd_year, ends_with("_ac"), -contains("urb_")) |> 
+  pivot_longer(ends_with("_ac"), values_to = "ac") |> 
+  mutate(
+    aoi = if_else(str_detect(name, "rp100"), "rp100", "cat"),
+    nlcd_class = str_remove(name, "cat") |> str_remove("rp100") |> str_remove("_ac"),
+    name = NULL
+  ) |> 
+  #pivot_wider(names_from = aoi, values_from = value) |> 
+  ggplot() +
+  geom_col(aes(nlcd_year, ac, fill = nlcd_class)) +
+  scale_fill_manual(values = pal_nlcd) +
+  facet_wrap(~aoi, scales = "free")
+#really no road to speak of, so also confirms that some river gravel is getting (at least) urblo/urbop
+sc_nlcd |> 
+  filter(comid=="23997114") |> 
+  select(wria_nr_nm, cnty, comid, nlcd_year, contains("urb"))
+
+```
+
+
+- For Discussion note that upland impervious extent is highly likely to affect riparian ecohydrology - 100ft means very different things as a narrow strip of evident green vs an hard to distinguish point along a continuous gradient of forest. In addition to site-specific slope and soils factors, encompassing watershed hydrologic condition has inevitably shaped our understanding of the functional dimensions that underlie buffer formulations, but that this context has changed with increasing imperviousness and alteration of flow paths (i.e., away from saturation excess and towards infiltration excess dynamics). While an SPTH standard allows for some flexibility to avoid prescribing a single critical area dimension, the basic concept may be invalidated where upland surface alteration has rendered even some unknown multiple of SPTH (2x or 5x etc.) insufficient to perform all desired functions.
+
 
 via Ken M: [Danielle Lazarus MS thesis, adv Withey](https://collections.evergreen.edu/files/original/ba7eb58e31f36d4592dadb2e962112724ca53982.pdf)
 - nice intro, lit review; strong policy awareness; appreciate the 'positionality' statement
-- statewide, NLCD + CDL at 50/100/SPTH200; aggregated to 3 class dev/ag/natural
+- statewide, NLCD + CDL at 50/100/SPTH200
 - buffer creation looks similar to RDE tessellation (combo of line and poly NHD hydrography, also VSW); appear to have unioned individual segments before raster extracts/zonal stats
 - reclassed to woody/shrubherb/devhimd/devloop and then dev/ag/'potential riparian' (tables 3&4, p92 of pdf, p74 of doc)
 - table 7 lists buffer acreages by 'simple' & total classes; statewide SPTH of ~7.979m is > ~6.4m for rp100 estimate from 2001 despite tribal and openwater/ice exclusions, coincidence that '100ft' total ~6.139m (3.413W + 2.726E) is much closer?
@@ -69,17 +131,27 @@ sc_nlcd |>
 
 
 
-via George W, intro to shoreline HRCD mscpt:
+
 Alberti, M., R. Weeks, and S. Coe. 2004. Urban land-cover change analysis in central Puget Sound. Photogrammetric Engineering & Remote Sensing 70:1043–1052
 
 Hepinstall-Cymerman, J., S. Coe, and L.R. Hutyra. 2013. Urban growth patterns and growth management boundaries in the central Puget Sound, Washington, 1986–2007. Urban Ecosystems 16:109–129.
 
 Kennedy, R.E., Z. Yang, J. Braaten, C. Copass, N. Antonova, C. Jordan, and P. Nelson. 2015. Attribution of disturbance change agent from Landsat time-series in support of habitat monitoring in the Puget Sound region, USA. Remote Sensing of Environment 166:271-285.
 
+Jones KB, Slonecker ET, Nash MS, Neale AC, Wade TG, et al. (2010) Riparian habitat changes across
+the continental United States (1972–2003) and potential implications for sustaining ecosystem ser-
+vices. Landscape Ecol 25: 1261–1275.
+  - 1973-2003 in 5 periods for 10/20km blocks within HUCs, 30m coarsened to 60m from Landsat+NAIP, NLCD baseline + manual, 180m buffers on 1:24K NHD
+  - Fig4 shows per-period increases in "%Urban", no helpful breakdown to WA/PNW
+  - Fig6 shows "eco2" PS-lowlands loss of natural strongest in late70-80s and mid80-early90s (largest mean decline of all ecoreg)
 
 Bartz, K. K., M. J. Ford, T. J. Beechie, K. L. Fresh, G. R. Pess, R. E. Kennedy, M. L. Rowse, and M. Sheer. 2015. Trends in developed land cover adjacent to habitat for threatened salmon in Puget Sound, Washington, U.S.A. PLoS One 10:1–22.
-  - Puget Sound only (and not Kitsap, HC, fair bit of JDF), LandTrendr Landsat 1986-2008
-  
+  - Puget Sound only (and not Kitsap, HC, fair bit of JDF), LandTrendr Landsat 30m 1986-2008
+  - 100m on various forms/habitat types, mainstem >25m bfw distinguished from tribs 5-25m bfw
+  - unclear _exactly_ what "developed" was here since it comes from randomforest trained on NLCD2001, but no uncertainty in what the "associated most strongly with hi/lo" means other than 64%/69% accuracy for dev/evergreen in manual random validation, and 78%/90% for dev/no-dev: "LandTrendr-stabilized images were used to develop yearly land cover maps based on training information derived from the 2001 National Land Cover Database (NLCD) land cover maps. Because not all of the 16 original land cover classes in the NLCD maps were statistically separable, they were first aggregated into 7 classes that were distinguishable from spectral data alone: open water, snow/ice, barren land, deciduous forest, evergreen forest, herbaceous, and developed. The LandTrendr “developed” class is associated most strongly with the medium-, and high-intensity developed NLCD classes, defined as 50–79%, and 80–100% impervious, respectively. Stabilized imagery from 2001 was linked with the aggregated NLCD land cover at a random sample of locations across the Puget Sound region, and the RandomForests classification algorithm was used to model the relationship between spectral data and the land cover classes. Once established for 2001, this model was then applied to stabilized imagery from all other years between 1986 and 2008."
+  - notably report not just flattening increases but actually _decreasing_ developed areas in some basins/mainstems/tribs, esp after breakpoints, see Fig 8, esp Nisq and Desch mainstem;
+    - explain as possibly due to vegetation maturation/growth over no-longer-new impervious that alters spectral signature (i.e., an artifact rather than a true ground-level decrease), but note possibility of being partially due to floodplain/mainstem restoration actions...
+
 
 
 **GPT**
@@ -126,12 +198,14 @@ Yeakley & Hughes (2013) in "Wild Salmonids in the Urbanizing Pacific Northwest" 
 
 Sweeney & Blaine (2007) pointed out that while 20th-century industrialization cleared riparian zones for agriculture and urban centers, the early 21st century has seen urbanization shift towards watershed-wide impacts with smaller but more widespread impervious additions.
 
+[This is inaccurate, study was in TN]
 Hall & Hossain (2020) analyzed impervious surface growth through remote sensing, showing that riparian zones continue to lose pervious surfaces at alarming rates in urbanizing areas of Washington State, driven more by diffuse suburban and exurban development rather than concentrated industrial zones.
 
 Kaushal et al. (2015) described how urban evolution from the Industrial Revolution to present resulted in increasing decoupling of streams from their riparian buffers due to impervious surface growth. Washington State's riparian areas are no exception, facing "impervious encroachment" well into the 21st century.
 
 Ricker et al. (2012) documented historic land use shifts, illustrating that impervious surfaces began dramatically impacting riparian soil functions by mid-20th century, while the 21st century has seen a diversification in impervious encroachment patterns rather than outright expansion rates.
 
+[UW MS thesis]
 Nayak (2023) focused on the Cedar River-Lake Washington watershed, reporting a measurable increase in impervious surface area within 54 identified riparian zones, noting that 21st-century growth is more nuanced due to zoning policies, yet significant enough to influence water quality and hydrology.
 
 Comparative Insight:
@@ -149,9 +223,7 @@ Kaushal, S.S., McDowell, W.H., Wollheim, W.M., et al., 2015. Urban evolution: Th
 Ricker, M.C., Donohue, S.W. and Stolt, M.H., 2012. Development and application of multi-proxy indices of land use change for riparian soils in southern New England, USA. Ecological Applications, 22(5), pp.1474–1491. Available at: https://www.researchgate.net/profile/Michael-Zavada-2/publication/225051164_Development_and_application_of_multi-proxy_indices_of_land_use_change_for_riparian_soils_in_southern_New_England_USA/links/5627ff9008ae518e347b3173/Development-and-application-of-multi-proxy-indices-of-land-use-change-for-riparian-soils-in-southern-New-England-USA.pdf [Accessed 4 August 2025].
 Nayak, S., 2023. Impact of Riparian Landscape Patterns on Water Quality in an Urbanizing River Basin: A Case of Cedar River-Lake Washington Watershed. Master's thesis. University of Washington. Available at: https://digital.lib.washington.edu/researchworks/bitstream/handle/1773/49961/Nayak_washington_0250O_23832.pdf?sequence=1 [Accessed 4 August 2025].
 
-[...]
 
-This analysis offers a landscape-scale perspective on conditions and changes within a simple, spatially-defined riparian corridor, using readily-available datasets to examine broad patterns that span numerous jurisdictions as well as substantial hydroclimate and habitat variation. A primary focus is on "urban" cover as an indicator of imperviousness. Impervious cover has statewide relevance in mesic (western) and semi-arid (eastern) regions, and is well-understood to be associated with ecohydrologic degradation.
 
 
 # Data & methods 
@@ -904,10 +976,19 @@ d |>
 
 # Citations
 
+Chapman, M., Satterfield, T., & Chan, K. M. A. 2020. How value conflicts infected the science
+of riparian restoration for endangered salmon habitat in America’s Pacific Northwest:
+Lessons for the application of conservation science to policy. Biological Conservation,
+244, 108508. https://doi.org/10.1016/j.biocon.2020.108508
+
 Hill, Ryan A., Marc H. Weber, Scott G. Leibowitz, Anthony R. Olsen, and Darren J. Thornbrugh, 2016. The Stream-Catchment (StreamCat) Dataset: A Database of Watershed Metrics for the Conterminous United States. Journal of the American Water Resources Association (JAWRA) 52:120-128. DOI: 10.1111/1752-1688.12372.
+
+Knutson, K. L., and Naef, V. L. 1997. Management recommendations for Washington’s priority
+habitats: Riparian (p. 181pp.). Washington Department of Fish and Wildlife.
 
 Weber M (2025). _StreamCatTools: Tools to Work with the StreamCat API Within R and Access the Full Suite of StreamCat and LakeCat Metrics_. R package version 0.6.0, commit d8a8cce142e7cb9e3666a2660a8315a1766e5981, <https://github.com/USEPA/StreamCatTools>.
 
+Wilhere G and Quinn T. 2018. How Wide is Wide Enough?: Science, Values, and Law in Riparian Habitat Conservation, 58 Nat. Resources J.279, https://digitalrepository.unm.edu/nrj/vol58/iss2/13/
 
 ::: {.content-hidden when-format="html"}
 
