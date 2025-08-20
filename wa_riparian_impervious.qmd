@@ -43,26 +43,24 @@ Accordingly, the SPTH200 concept in the 2020 WDFW guidance - that the height of 
 
 But despite the well-understood importance of riparian areas and the considerable attention devoted to their study in Washington and the western United States more broadly, considerable uncertainty still surrounds basic measures of riparian condition and change at the landscape scale. Notwithstanding the qualitative consensus that riparian ecosystems have experienced "substantial" or "dramatic" changes, quantitative estimates vary widely, and these differences may hinder effective communication or setting appropriate policy objectives. 
 
-This analysis therefore addresses the need for landscape scale quantification, with a primary focus on "urban" cover as an indicator of imperviousness. Impervious cover has statewide relevance in mesic (western) and semi-arid (eastern) regions, and is well-understood to be associated with ecohydrologic degradation. Specifically, we investigated the seemingly simple question "How much impervious surface has Washington state added to riparian zones in the 21st century, and how has that related to prior changes during the 20th century?"
+This analysis therefore addresses the need for landscape scale quantification, with a primary focus on "urban" cover as an indicator of imperviousness (much impervious area occurs outside of large cities, but "urban" avoids the unintended connotations of the term "developed"). Impervious cover has statewide relevance in mesic (western) and semi-arid (eastern) regions of the state, and is well-understood to be associated with ecohydrologic degradation. Specifically, we investigated the seemingly simple question "How much impervious surface has Washington state added to riparian areas in the 21st century?"
 
-Past research has indicated likely patterns without providing a clear answer to this question. Jones et al. (2010) considered late 20th century land cover change (1973-2003) at relatively coarse spatial resolution (60m) within a 180m buffer of NHD watercourses in several thousand sample blocks across the continental United States. They described a nationwide monotonic increase in the average riparian "urban %" over the assessed duration, and their results showed the Puget lowlands region had the largest decrease in "natural land cover" during the "mid 80s - early 90s" period (relative both to its change in other time periods and to all other regions nationally in that period).
+Past research has indicated likely patterns without providing a clear answer to this inquiry Jones et al. (2010) considered late 20th century land cover change (1973-2003) at relatively coarse spatial resolution (60m) within a 180m buffer of NHD watercourses in several thousand sample blocks across the continental United States. They described a nationwide monotonic increase in the average riparian "urban %" over the assessed duration, and their results showed the Puget lowlands region had the largest decrease in "natural land cover" during the "mid 80s - early 90s" period (relative both to its change in other time periods and to all other regions nationally in that period).
 
 Increased "urban" or impervious cover within Puget Sound was also described by Powell et al. (2008) and Bartz et al. (2015). Throughout the Snohomish basin of central Puget Sound, north of Seattle, an increase of 255%, from 3285 ha in 1972 to 11,652 ha in 2006 was detected from a nuanced analysis combining manual orthophoto review with Landsat imagery spanning 1972 to 2006. Though not focused on riparian areas, this study indicated that a rapid impervious expansion during the 1980s then slowed somewhat throughout the 1990s before returning to a faster rate after 2000. The authors noted the potential for changes in land use regulations to have influenced this trajectory, chiefly the 1990 passage of GMA, but stated a need for more detailed study of additional alternative factors before any direct attribution.
 
 Broadening to more watersheds, Bartz et al. (2015) found similar dynamics in an assessment of annual changes derived from a LandTrendr per-pixel analysis of 30m imagery within 100m or 200m buffers of salmon habitat geographic features. Within these assessed areas, they estimated that, by 2008, impervious cover in mainstem zones increased roughly 172ha (~425ac, 3%) from ~5820ha in 1986, and that tributary zones increased roughly 119ha (294ha, 5.5%) from ~2,153ha. However, they also reported evidence of a "flatter" rate of increase in urban cover across these and the other nearshore, estuary, and floodplain habitat areas examined, with the timing of inflections varying considerably among habitat types and subbasins. These authors were unequivocal that a legacy of degradation continues to affect Puget Sound habitats, but they also concluded that more recent land cover change may indicate slower growth in additional impairment, perhaps associated with a combination of cultural, economic and regulatory factors.
 
+Lazarus (2023) considered a statewide extent, using the National Land Cover Dataset (NLCD) and Cropland Data Layer (CDL) to examine the relative prevalence of vegetation and impervious cover classes within alternative riparian buffer configurations on lands stratified by public and private ownership. This analysis sought to address a holistic set of shifts among multiple land uses across Washington's varied ecoregions, but an increase in impervious-type classes was broadly apparent, estimated to total more than 4,500 ha (>11,000 acres) in the SPTH200 buffer between 2001 and 2019 (see table 16, as the combination of all 4 NLCD 'developed' classes).  
 
-  - Lazarus 2023 thesis (different stratification: public-private, other exclusions)
+[...]
+
+
+StreamCat/NLCD...comparing the RDE with a simple, spatially-defined riparian corridor
 
 terms and defs: 
   - rmz vs 'corridor', buffer etc.
-  - impervious, urban, developed
-
-
-...comparing the RDE with a simple, spatially-defined riparian corridor
-
-...using readily-available datasets to examine broad patterns that span numerous jurisdictions as well as substantial hydroclimate and habitat variation. 
-
+  - need to make clear that counties are geographic units that contain multiple jurisdictions NOT the jurisdictional area of county governments
 
 
 ## notes
@@ -70,6 +68,7 @@ terms and defs:
 - RDE/HRCD
   - need to get fully certain that 2011-17 is the time span
   - presentation of county/larger aggregates that mix reaches with/without floodplain (since no 'zone' attrib in API tables)
+  - SWIFD stratification?
   
 - SC/NLCD
   - rethink whether d_cat_rp100 are valid: if cat is X% giving 10ac and rp100 is Y% giving 10ac, is 0ac d_cat_rp100 always accurate?
@@ -83,94 +82,16 @@ terms and defs:
 
 - Add county level population change numbers? fit: urb_ac_rp100 ~ year + pop + housing
   - capture that per-person increases decreasing even as abs continues to increase? or just use bookend pop numbers [now seeing this was done in Powell et al (fig 6, continuously) and Bartz et al (text, bookends)]
-```{r quick_peek_against_ofm}
-ofm_housing <- readxl::read_excel(
-  file.path(dir_data_common, "census", "ofm_april1_postcensal_estimates_housing_1980_1990-present.xlsx"),
-  sheet = 2, skip = 2, na = "."
-  ) |> 
-  drop_na(Filter) |>  #filter(Filter!=".") |> 
-  janitor::clean_names() |> 
-  select(filter, county, jurisdiction, contains("total_housing")) |> 
-  pivot_longer(contains("total_housing"), values_to = "total_housing") |> 
-  mutate(
-    year = str_sub(name, 2, 5), name = NULL,
-    across(c(year, total_housing), as.numeric)
-    )
-
-ofm_housing_cnty <- ofm_housing |> 
-  filter(filter == "1", year > 1980) |> 
-  select(cnty = county, year, total_housing)
-
-ofm_housing_cnty |> #count(jurisdiction) |> print(n=50)
-  plotly::plot_ly(name = ~cnty) |> plotly::add_lines(x = ~year, y = ~total_housing)
-
-ofm_housing_cnty |> filter(year == 1990) |> 
-  #arrange(desc(total_housing)) |> print()
-  filter(total_housing > 50000) |> 
-  ggplot(aes(total_housing, fct_reorder(cnty, total_housing, identity))) +
-  geom_col() #+ scale_x_log10(labels = scales::label_log())
-
-#maybe not the most sensible way to viz, better as lm-est-vs-lm-est or similar?
-inner_join(
-  sc_nlcd_ac_y_cnty
-  ,
-  ofm_housing_cnty
-  ,
-  by = c("cnty", "nlcd_year" = "year")
-) |> 
-  filter(nlcd_class == "urbhi", aoi != "cat") |> 
-  filter(str_detect(cnty, "King|Pierce|Snoho|Spoka|Clark|Kitsap|Yakim|Thurst|Whatc")) |> 
-  ggplot(aes(total_housing, ac, color = cnty, group = cnty)) +
-  geom_point(size = 0.5) +
-  geom_line() +
-  facet_wrap(~aoi, ncol = 1, strip.position = "right", labeller = label_wrap_gen(multi_line = F), scales = "free") +
-  labs(subtitle = "StreamCat NLCD urbhi cover relative to OFM housing est. 2001-2019\nwithin (lower, rp100) and outside 100m riparian corridor (d_cat_rp100)")
-
-
-```
  
 - 2021 1m imperv CCAP/Ecopia https://coastalimagery.blob.core.windows.net/ccap-landcover/CCAP_bulk_download/High_Resolution_Land_Cover/Phase_1_Initial_Layers/Impervious/index.html
   - needs processing: SPTH perhaps via Colin's RDE scripts, StreamCat would be question to Mark et al. (opened issue)
 
-- Do we know any locations with unambiguous ground level de-paving/removal of impervious surface?
-```{r elwha_reservoir_in_nlcd}
-x<-filter(sf_flw, wria=="18"); y<-filter(sf_cat, wria=="18"); mapview::mapview(x)+mapview::mapview(y)
-#lower dam and resvr: "23997060"
-#upper mid resvr, could include several other lines: "23997114"
 
-x<-filter(sf_flw, comid=="23997114") |> st_buffer(dist = 300)
-y<-filter(sf_cat, comid=="23997114")
-mapview::mapview(x)+mapview::mapview(y)
-#yep. very nice. 
-sc_nlcd |> 
-  filter(comid=="23997114") |> 
-  select(wria_nr_nm, cnty, comid, nlcd_year, ends_with("_ac"), -contains("urb_")) |> 
-  pivot_longer(ends_with("_ac"), values_to = "ac") |> 
-  mutate(
-    aoi = if_else(str_detect(name, "rp100"), "rp100", "cat"),
-    nlcd_class = str_remove(name, "cat") |> str_remove("rp100") |> str_remove("_ac"),
-    name = NULL
-  ) |> 
-  #pivot_wider(names_from = aoi, values_from = value) |> 
-  ggplot() +
-  geom_col(aes(nlcd_year, ac, fill = nlcd_class)) +
-  scale_fill_manual(values = pal_nlcd) +
-  facet_wrap(~aoi, scales = "free")
-#really no road to speak of, so also confirms that some river gravel is getting (at least) urblo/urbop
-sc_nlcd |> 
-  filter(comid=="23997114") |> 
-  select(wria_nr_nm, cnty, comid, nlcd_year, contains("urb"))
-
-```
-
-- For Discussion note that upland impervious extent is highly likely to affect riparian ecohydrology - 100ft means very different things as a narrow strip of evident green vs an hard to distinguish point along a continuous gradient of forest. In addition to site-specific slope and soils factors, encompassing watershed hydrologic condition has inevitably shaped our understanding of the functional dimensions that underlie buffer formulations, but that this context has changed with increasing imperviousness and alteration of flow paths (i.e., away from saturation excess and towards infiltration excess dynamics). While an SPTH standard allows for some flexibility to avoid prescribing a single critical area dimension, the basic concept may be invalidated where upland surface alteration has rendered even some unknown multiple of SPTH (2x or 5x etc.) insufficient to perform all desired functions.
 
 - tie in Swartz et al 2024 showing real-world variation in 'fixed width' forest harvest buffers? As related to Folkerts et al 2020 Mapping Critical Areas report?
 
 ## lit notes
-
 see sc_ripcorr_nlcd for initial 
-
 
 Hepinstall-Cymerman, J., S. Coe, and L.R. Hutyra. 2013. Urban growth patterns and growth management boundaries in the central Puget Sound, Washington, 1986–2007. Urban Ecosystems 16:109–129.
 
@@ -180,15 +101,15 @@ Kennedy, R.E., Z. Yang, J. Braaten, C. Copass, N. Antonova, C. Jordan, and P. Ne
 [UW MS thesis]
 Nayak (2023) focused on the Cedar River-Lake Washington watershed, reporting a measurable increase in impervious surface area within 54 identified riparian zones, noting that 21st-century growth is more nuanced due to zoning policies, yet significant enough to influence water quality and hydrology.
 
-Comparative Insight:
+Nayak, S., 2023. Impact of Riparian Landscape Patterns on Water Quality in an Urbanizing River Basin: A Case of Cedar River-Lake Washington Watershed. Master's thesis. University of Washington. Available at: https://digital.lib.washington.edu/researchworks/bitstream/handle/1773/49961/Nayak_washington_0250O_23832.pdf?sequence=1 [Accessed 4 August 2025].
+
+
+ScholarGPT via Ken M: 
+>Comparative Insight:
 20th Century Industrialization Phase: Characterized by aggressive land clearing for agriculture, timber, and heavy industrial operations, leading to direct and large-scale riparian buffer destruction.
 21st Century Urbanization: Expansion is less aggressive per unit area but more pervasive, leading to cumulative impacts over broader areas due to residential, infrastructural, and commercial suburban sprawl.
 Conclusion:
 While the scale and patterns of impervious surface expansion have shifted from concentrated industrial footprints in the 20th century to more distributed urban/suburban expansion in the 21st, the net effect has been a continued loss of riparian function and buffer integrity across Washington State. Despite improved regulatory frameworks, growth management efforts have only partially mitigated these trends.
-
-Nayak, S., 2023. Impact of Riparian Landscape Patterns on Water Quality in an Urbanizing River Basin: A Case of Cedar River-Lake Washington Watershed. Master's thesis. University of Washington. Available at: https://digital.lib.washington.edu/researchworks/bitstream/handle/1773/49961/Nayak_washington_0250O_23832.pdf?sequence=1 [Accessed 4 August 2025].
-
-
 
 
 # Methods 
@@ -206,11 +127,38 @@ sf_cnty <- sf::read_sf(file.path(dir_data_common, "WA_County_Boundaries/WA_Count
   sf::st_transform(sf::st_crs(epsg))
 ```
 
+```{r ofm_housing_cnty}
+ofm_housing <- readxl::read_excel(
+  file.path(dir_data_common, "census", "ofm_april1_postcensal_estimates_housing_1980_1990-present.xlsx"),
+  sheet = 2, skip = 2, na = "."
+  ) |> 
+  drop_na(Filter) |>  #filter(Filter!=".") |> 
+  janitor::clean_names() |> 
+  select(filter, county, jurisdiction, contains("total_housing")) |> 
+  pivot_longer(contains("total_housing"), values_to = "total_housing") |> 
+  mutate(
+    year = str_sub(name, 2, 5), name = NULL,
+    across(c(year, total_housing), as.numeric)
+    )
+
+ofm_housing_cnty <- ofm_housing |> 
+  filter(filter == "1", year > 1980) |> 
+  select(cnty = county, year, total_housing)
+
+# ofm_housing_cnty |> #count(jurisdiction) |> print(n=50)
+#   plotly::plot_ly(name = ~cnty) |> plotly::add_lines(x = ~year, y = ~total_housing)
+# 
+# ofm_housing_cnty |> filter(year == 1990) |> 
+#   #arrange(desc(total_housing)) |> print()
+#   filter(total_housing > 50000) |> 
+#   ggplot(aes(total_housing, fct_reorder(cnty, total_housing, identity))) +
+#   geom_col() #+ scale_x_log10(labels = scales::label_log())
+
+```
+
 ## Riparian Data Engine
 
-The full set of whole-WRIA reach tables were compiled from the public web application.
-
-```{r build_rde_wria_library, eval=FALSE}
+```{r build_rde_wria_library, include=F, eval=FALSE}
 # #first DL csv
 # walk(
 #   #1:30,
@@ -230,7 +178,7 @@ The full set of whole-WRIA reach tables were compiled from the public web applic
 # )
 ```
 
-```{r build_rch_tbl, eval=FALSE}
+```{r build_rch_tbl_wria, include=F, eval=FALSE}
 #then build combined object: 1084192 x 40
 #note deduplicating 52 shared across wrias: length(unique(rch_tbl$pid)) == 1084140
 rch_tbl <- map_df(
@@ -256,6 +204,31 @@ glimpse(rch_tbl)
 #saveRDS(rch_tbl, "~/T/DFW-Team WDFW Watershed Synthesis - data_common/rde/wria_rch_tbl.rds")
 
 ```
+
+```{r rde_wria, include=F, eval=FALSE}
+rde_wria <- readRDS("~/T/DFW-Team WDFW Watershed Synthesis - data_common/rde/wria_rch_tbl.rds") |> 
+  mutate(
+    wria = factor(wria),
+    tree_pct = all_tree_cover_ac / all_land_cover_ac,
+    veg_pct = all_vegetated_ac / all_land_cover_ac
+    ,
+    swifd_any = !is.na(swifd_salmon_distribution),
+    swifd_n = 1 + str_count(swifd_salmon_distribution,","),
+    swifd_n_fct = case_when(
+      is.na(swifd_n) ~ "none",
+      swifd_n < 3 ~ "1-2 species",
+      swifd_n >= 3 ~ "3 or more species"
+    ),
+    swifd_chin = case_when(
+      str_detect(swifd_salmon_distribution, "Chin") ~ "salmon_with_chin",
+      str_detect(swifd_salmon_distribution, "Chin", negate = T) ~ "salmon_not_chin",
+      is.na(swifd_salmon_distribution) ~ "not_salmon"
+    )
+  ) 
+
+```
+
+The complete set of "reach tables" were compiled from the public RDE web application, comprising attribute values for more than 1 million individual units of the SPTH200-based polygon tesselation. The permanent identifiers that index rows in this structure can include a combination of "extent of observed water" (EOW), "floodplain" (primarily based on FEMA mapping), and riparian management zone (RMZ, both banks where double-banked) geometry. 
 
 ```{r build_rde_cnty_library, eval=FALSE}
 walk(
@@ -311,8 +284,6 @@ glimpse(rch_tbl_cnty)
 
 ```
 
-A complete set of reach tables includes values for >1mil rows statewide, indexed by `pid` (permanent identifiers). In this structure, a `pid`-row can include a combination of "extent of observed water" (EOW), "floodplain" (primarily based on FEMA mapping), and riparian management zone (RMZ, both banks where double-banked) geometry. However, the results presented here are based on the area (acreage) associated with the RMZ and EOW "riparian corridor".
-
 ```{r rde_cnty}
 #for any statewide sum need: distinct(pid, .keep_all = T)
 #no way in this table structure, without a 'zone' attribute', to differentiate RMZ-EOW-Floodplain
@@ -338,39 +309,25 @@ rde_cnty <- readRDS("~/T/DFW-Team WDFW Watershed Synthesis - data_common/rde/cnt
 
 ```
 
-```{r rde_wria}
-rde_wria <- readRDS("~/T/DFW-Team WDFW Watershed Synthesis - data_common/rde/wria_rch_tbl.rds") |> 
-  mutate(
-    wria = factor(wria),
-    tree_pct = all_tree_cover_ac / all_land_cover_ac,
-    veg_pct = all_vegetated_ac / all_land_cover_ac
-    ,
-    swifd_any = !is.na(swifd_salmon_distribution),
-    swifd_n = 1 + str_count(swifd_salmon_distribution,","),
-    swifd_n_fct = case_when(
-      is.na(swifd_n) ~ "none",
-      swifd_n < 3 ~ "1-2 species",
-      swifd_n >= 3 ~ "3 or more species"
-    ),
-    swifd_chin = case_when(
-      str_detect(swifd_salmon_distribution, "Chin") ~ "salmon_with_chin",
-      str_detect(swifd_salmon_distribution, "Chin", negate = T) ~ "salmon_not_chin",
-      is.na(swifd_salmon_distribution) ~ "not_salmon"
-    )
-  ) 
 
-```
-
-
-```{r cnty_impv_hot_take}
+```{r qaqc_and_hot_take_cnty_impv, include=F, eval=FALSE}
 
 rde_cnty_sum_impv <- rde_cnty |> 
   summarise(
     across(
-      contains("impv"),
+      #contains("impv"),
+      c(reach_ac, nonfstry_impv_inc_ac, nonfstry_tree_dec_ac),
       ~sum(., na.rm = T)
     )
     , .by = cnty
+  ) |> 
+  mutate(
+    across(
+      starts_with("nonf"),
+      list(
+        per_100ac = ~100*(./reach_ac)
+      )
+    )
   )
 
 rde_cnty_sum_impv <- rde_cnty_sum_impv |> 
@@ -419,13 +376,78 @@ rde_cnty_sum_impv |>
   gt() |> 
   fmt_number("nonfstry_impv_inc_ac", decimals = 2)
 
-#qaqcing Skagit to better understand how much of this change may be in floodplain
+#qaqcing Skagit to better understand how much of this change may be in floodplain (a lot)
 #if 'floodplain' is left selected from Skagit county page, this has largest imp inc of 21ac
 #https://ripariandata.wdfw.wa.gov/reaches/128936102
 filter(rde_cnty, pid == "128936102") |> glimpse() #large floodplain appears to have most HRCD polys
 #if 'floodplain' deselected from Skagit county page, this has largest imp inc of 6ac
 #https://ripariandata.wdfw.wa.gov/reaches/165685545
 filter(rde_cnty, pid == "165685545") |> glimpse() #matches
+
+
+#going to UGA level. unlikely for peer-review mscp other than example/case study
+#975 name strings, many with several UGAs
+rde_cnty |> 
+  count(city_uga_names) |> arrange(desc(n)) |> print(n = 50)
+
+#Sumner looks to have had major new industrial/warehouse footprints on White R bottomlands
+#https://earthengine.google.com/timelapse#v=47.22426,-122.22593,11.665,latLng&t=1.75&ps=50&bt=19840101&et=20221231
+rde_cnty |> 
+  filter(nonfstry_impv_inc_ac > 0) |> 
+  summarise(
+    across(
+      c(reach_ac, nonfstry_impv_inc_ac, nonfstry_tree_dec_ac),
+      ~sum(., na.rm = T)
+    )
+    , .by = c(cnty, city_uga_names)
+  ) |> 
+  arrange(desc(nonfstry_impv_inc_ac))
+
+#some very large reaches, mostly lakes and Columbia with mostly EOW
+rde_cnty |>
+  arrange(desc(reach_ac)) |> select(pid, cnty, ends_with("_ac"))
+#Lk WA is one 28K ac PID: https://ripariandata.wdfw.wa.gov/reaches/148897889
+
+#fed/state/tribal/muni/private cols cannot be used to limit/exclude jurisdictional extents in counties
+#occurrence of some PADUS acreage has little association with impinc
+#likely due to potential for spatial co-occurrence in single reach
+#possible that some new impervious "on/in" protected area
+#but also possible and perhaps more probable that large reaches contain spatially nonintersecting both
+#all PADUS cols either NA or numeric per reach, such that is.na(federal_ac) 
+rde_cnty |> 
+  #drop_na(federal_ac) |> filter(is.na(state_ac) | is.na(tribal_ac) | is.na(municipal_ac) | is.na(private_ngo_ac))
+  mutate(has_padus_ac = !is.na(federal_ac)) |> 
+  summarise(
+    across(
+      c(reach_ac, nonfstry_impv_inc_ac, nonfstry_tree_dec_ac),
+      ~sum(., na.rm = T)
+    )
+    , .by = c(has_padus_ac)
+  ) |> 
+  mutate(
+    across(starts_with("nonf"), list(pct = ~./reach_ac))
+  )
+
+#little association of imperv to PADUS for reaches with both
+#neither clear positive corr suggesting more impinc in larger reaches
+#nor clear negative corr signaling less impinc
+rde_cnty |> 
+  filter(nonfstry_impv_inc_ac > 0) |> #7541
+  select(pid, cnty, swifd_any,
+         nonfstry_impv_inc_ac,
+         federal_ac:tribal_ac
+         ) |> 
+  pivot_longer(
+    federal_ac:tribal_ac, names_to = "auth", values_to = "ac"
+  ) |> 
+  filter(ac > 0) |> #distinct(pid) #2540 of 7541 with nonzero impinc && nonzero PADUSac
+  filter(ac < 1000) |> #exclude some big EOW/floods to see better
+  ggplot(aes(ac, nonfstry_impv_inc_ac, color = auth)) +
+  geom_point(alpha = 0.3, size = 0.3, show.legend = F) +
+  scale_x_log10() +
+  scale_y_log10() +
+    facet_wrap(~auth, scales = "free")
+
 
 ```
 
@@ -570,7 +592,174 @@ wrias <- as.character(c(1,7,8,10,15, 28,32,37,45,57))
 #save.image("sc_ripcorr_nlcd.RData")
 ```
 
-# Results [complete overhaul]
+# Results
+
+*results presented here are based on the area (acreage) associated with the RMZ and EOW [+FLOODPLAIN] "riparian corridor"*
+*reiterate/stress counties as geographic not jurisdictional*
+
+distribution of individual increases illustrates "individually small, large in aggregate" and "typically less than 25% of total reach area" 
+
+```{r gg_rde_cnty_per_reach_imp_inc}
+# rde_cnty |> 
+#   filter(nonfstry_impv_inc_ac > 0) |> 
+#   ggplot(aes(
+#     nonfstry_impv_inc_ac,
+#     fct_reorder(cnty, nonfstry_impv_inc_ac)
+#     )) +
+#   geom_jitter(height = 0.2, alpha = 0.5, size = 0.4) +
+#   #geom_boxplot(varwidth = T, outliers = F, fill = NA) + 
+#   #wacolors::scale_fill_wa_c("volcano", reverse = T, na.value = "pink", aesthetics = c("fill","color")) +
+#   labs(y = NULL, x = "acres")
+
+rde_cnty |> 
+  filter(nonfstry_impv_inc_ac > 0) |> #7541
+  filter(nonfstry_impv_inc_ac < 20) |> #7531
+  ggplot(aes(
+    nonfstry_impv_inc_ac,
+    fct_reorder(cnty, nonfstry_impv_inc_ac, sum)
+    )) +
+  geom_vline(xintercept = 1, linetype = 3) +
+  geom_jitter(height = 0.2, alpha = 0.5, size = 0.4) +
+  geom_boxplot(varwidth = T, outliers = F, color = "orange", fill = NA) + 
+  labs(y = NULL, x = "acres",
+       title = "Per-reach impervious cover increases",
+       subtitle = "Not showing 10 reaches with increases >20ac")
+
+#could also show as pct = nonfstry_impv_inc_ac / reach_ac
+rde_cnty |> 
+  filter(nonfstry_impv_inc_ac > 0) |> #7541
+  ggplot(aes(
+    nonfstry_impv_inc_ac / reach_ac,
+    fct_reorder(cnty, nonfstry_impv_inc_ac, sum)
+    )) +
+  geom_jitter(height = 0.2, alpha = 0.5, size = 0.4) +
+  geom_boxplot(varwidth = T, outliers = F, color = "orange", fill = NA) + 
+  scale_x_continuous(labels = scales::percent) +
+  labs(y = NULL, x = NULL,
+       title = "Per-reach impervious cover increases as percentage of reach area",
+       subtitle = "Reach acres = RMZ plus EOW and floodplain where present"
+       )
+
+```
+
+area normalized by county total reach acres (RMZ+EOW+Flood)
+illustrates the variation among counties, which here are geographic rather than jurisdictional units
+could do similar distributions as above for per-reach impinc / reach
+
+```{r gg_nonfstry_impv_inc_ac_per_100ac_col}
+
+{{
+  sf_cnty |> 
+    left_join(rde_cnty_sum_impv, by = "cnty") |> 
+    ggplot() + geom_sf(aes(fill = nonfstry_impv_inc_ac), show.legend = F) + 
+    wacolors::scale_fill_wa_c("volcano", reverse = T, na.value = "pink") +
+    labs(title = "Riparian impervious cover increase 2011-2017", subtitle = "Sum of HRCD estimates, RMZ+EOW+floodplain")
+}+{
+  sf_cnty |> 
+    left_join(rde_cnty_sum_impv, by = "cnty") |> 
+    ggplot() + geom_sf(aes(fill = nonfstry_impv_inc_ac_per_100ac), show.legend = F) + 
+    wacolors::scale_fill_wa_c("volcano", reverse = T, na.value = "pink") +
+    labs(subtitle = "Normalized per 100ac riparian")
+}}/{{
+  rde_cnty_sum_impv |> 
+    ggplot() + 
+    geom_col(aes(
+      nonfstry_impv_inc_ac,
+      fct_reorder(cnty, nonfstry_impv_inc_ac),
+      fill = nonfstry_impv_inc_ac), 
+      show.legend = F) + 
+    wacolors::scale_fill_wa_c("volcano", reverse = T, na.value = "pink") +
+    labs(y = NULL, x = "acres")
+}+{
+  rde_cnty_sum_impv |> 
+    ggplot() +
+    geom_col(aes(
+      nonfstry_impv_inc_ac_per_100ac,
+      fct_reorder(cnty, nonfstry_impv_inc_ac_per_100ac),
+      fill = nonfstry_impv_inc_ac_per_100ac),
+      show.legend = F) + 
+    wacolors::scale_fill_wa_c("volcano", reverse = T, na.value = "pink", aesthetics = c("fill","color")) +
+    labs(y = NULL, x = "Acres imp. inc. per 100ac") 
+}} +
+  plot_layout(guides = "collect")
+
+
+```
+
+area normalized vs abs area
+reinforces the implicit relationships in above figure
+
+```{r gg_nonfstry_impv_inc_ac_per_100ac_vs_abs}
+{
+rde_cnty_sum_impv |> 
+  ggplot(aes(nonfstry_impv_inc_ac, nonfstry_impv_inc_ac_per_100ac)) +
+  geom_point(size = 0.3, show.legend = F) + 
+  geom_text(aes(label = cnty), size = 3, check_overlap = F, show.legend = F) + 
+  geom_smooth(method = "lm") +
+  wacolors::scale_fill_wa_c("volcano", reverse = T, na.value = "pink", aesthetics = c("fill","color")) +
+  labs(
+    x = "Total acres", y = "Acres imp. inc. per 100ac",
+    title = "Impervious increases by county,\narea normalized vs absolute area") 
+}/{
+rde_cnty_sum_impv |> 
+  ggplot(aes(nonfstry_impv_inc_ac, nonfstry_impv_inc_ac_per_100ac)) +
+  geom_point(size = 0.3, show.legend = F) + 
+  geom_text(aes(label = cnty), size = 3, check_overlap = F, show.legend = F) + 
+  geom_smooth(method = "lm") +
+  wacolors::scale_fill_wa_c("volcano", reverse = T, na.value = "pink", aesthetics = c("fill","color")) +
+  coord_cartesian(xlim = c(0,75), ylim = c(0, 0.08)) +
+  labs(
+    x = "Total acres", y = "Acres imp. inc. per 100ac",
+    subtitle = "Counties with <75ac total increase") 
+}
+```
+
+vs housing
+
+```{r gg_nonfstry_impv_inc_ac_per_100ac_vs_housing}
+{
+rde_cnty_sum_impv |> 
+  ggplot(aes(d_hous, nonfstry_impv_inc_ac)) +
+  geom_point(size = 0.3, show.legend = F) + 
+  geom_text(aes(label = cnty), size =3, color = "purple", nudge_y = 0.005) +
+  geom_smooth(method = "lm") +
+  wacolors::scale_fill_wa_c("volcano", reverse = T, na.value = "pink", aesthetics = c("fill","color")) +
+  #scale_x_log10(labels = scales::label_log()) + 
+  labs(
+    x = "OFM 2017-2011 total housing unit change", 
+    y = "total est. impervious increase",
+    title = "Estimated riparian impervious increases vs total housing unit increase by county") 
+}/{
+rde_cnty_sum_impv |> 
+  ggplot(aes(d_hous, nonfstry_impv_inc_ac_per_100ac)) +
+  geom_point(size = 0.3, show.legend = F) + 
+  geom_text(aes(label = cnty), size =3, color = "purple", nudge_y = 0.005) +
+  geom_smooth(method = "lm") +
+  wacolors::scale_fill_wa_c("volcano", reverse = T, na.value = "pink", aesthetics = c("fill","color")) +
+  #scale_x_log10(labels = scales::label_log()) + 
+  labs(
+    x = "OFM 2017-2011 total housing unit change", 
+    y = "est. impervious increase per 100ac",
+    title = "Area normalized riparian impervious increases vs total housing unit increase by county") 
+}/{
+rde_cnty_sum_impv |> 
+  ggplot(aes(d_hous, nonfstry_impv_inc_ac_per_100ac)) +
+  geom_point(size = 0.3, show.legend = F) + 
+  geom_text(aes(label = cnty), size =3, color = "purple", nudge_y = 0.001) +
+  geom_smooth(method = "lm") +
+  wacolors::scale_fill_wa_c("volcano", reverse = T, na.value = "pink", aesthetics = c("fill","color")) +
+  coord_cartesian(xlim = c(500, 5000), ylim = c(0, 0.08)) +
+  labs(
+    x = "OFM 2017-2011 total housing unit change", 
+    y = "est. impervious increase per 100ac",
+    subtitle = "County areas with 500 to 5000 housing unit increases") 
+}
+
+  
+
+```
+
+
 
 ## 2001 Baseline
 
@@ -711,7 +900,6 @@ sc_nlcd_2019 |>
   tab_style(style = cell_borders(sides = "right"), locations = cells_body(columns = "rp100_pct_cat"))
 
 ```
-
 
 ```{r ggstatewide_ac_urb_nlcd_year}
 sc_nlcd |> 
@@ -1151,22 +1339,6 @@ ggplot() +
   )
 ```
 
-these need work, among other problems xscales are deceptive, even when filtering >0 some values <<1 look like zeros
-
-```{r need_work_comid_diff_histo, fig.height=6}
-{
-d |> 
-  filter(d_out > 0) |> 
-  ggplot() +
-  geom_histogram(aes(d_out, fill = cnty), position = position_dodge(width = 0.3))
-}+{
-d |> 
-  #filter(d_rp100 > 0) |> 
-  ggplot() +
-  geom_histogram(aes(d_rp100, fill = cnty), position = position_dodge(width = 0.3))
-}
-```
-
 
 ```{r arrowswarm}
 comids_2019_urb <- sc_nlcd |> 
@@ -1232,6 +1404,11 @@ d |>
 
 # Discussion
 
+  Scratch: We approached the question of how much impervious cover has been added to riparian areas in Washington state in the early part of the 21st century using high resolution land cover change data within an ecologically-grounded extent. In agreement with prior studies at smaller scales and coarser resolution, we found the answer to be both "a little", in that individual additions were mostly less than 1ha, and "a lot", in that the cumulative total of many small changes was still appreciable.
+
+
+  - note that upland impervious extent is highly likely to affect riparian ecohydrology - 100ft means very different things as a narrow strip of evident green vs an hard to distinguish point along a continuous gradient of forest. In addition to site-specific slope and soils factors, encompassing watershed hydrologic condition has inevitably shaped our understanding of the functional dimensions that underlie buffer formulations, but that this context has changed with increasing imperviousness and alteration of flow paths (i.e., away from saturation excess and towards infiltration excess dynamics). While an SPTH standard allows for some flexibility to avoid prescribing a single critical area dimension, the basic concept may be invalidated where upland surface alteration has rendered even some unknown multiple of SPTH (2x or 5x etc.) insufficient to perform all desired functions.
+
 # Conclusion
 
 # Acknowledgements
@@ -1247,6 +1424,8 @@ Hill, Ryan A., Marc H. Weber, Scott G. Leibowitz, Anthony R. Olsen, and Darren J
 
 Knutson, K. L., and Naef, V. L. 1997. Management recommendations for Washington’s priority
 habitats: Riparian (p. 181pp.). Washington Department of Fish and Wildlife.
+
+Lazarus, D., 2023. Current Status of Riparian Buffers in Washington State: Public and Private Land Cover Within Riparian Management Zones Based on Best Practice Guidelines (MES thesis, Evergreen State College).
 
 WDFW. 2024. A new way of looking at Washington’s waterways. Medium. https://wdfw.medium.com/a-new-way-of-looking-at-washingtons-waterways-ad05d872c4ce 
 
@@ -1505,684 +1684,6 @@ sc_nlcd |>
   scale_alpha_manual(values = c(0.3,0.8)) +
   geom_vline(xintercept = 0) +
   facet_wrap(~nlcd_class, nrow = 1, scales = "free")
-```
-
-
-delete soon...
-```{r streamcat_nlcd_overall_LUclass_EDA, eval=FALSE}
-## overall spatial patterns of streamcat NLCD classes
-## parsing to determine whether/how to drop and/or aggregate classes
-
-sc_nlcd_cat <- readRDS(file.path(dir_data_common, "streamcat", "sc_wa_nlcd.rds")) |> 
-  map(
-    ~.x |> 
-      rename_with(~str_remove(.,paste(c(2001, 2004, 2006, 2008, 2011, 2013, 2016, 2019),collapse = "|")) |> 
-                    str_remove("pct")) |> 
-      select(comid, nlcd_year, catareasqkm, ends_with("cat"))
-      ) |> 
-  list_rbind() |> 
-# distinct(comid, .keep_all = T) |>  #57313
-#   anti_join(as_tibble(sf_cat), by ="comid")
-  inner_join(
-    as_tibble(sf_cat) |> select(comid, wria, wria_nr_nm), by = "comid"
-  )
-
-#all classes all years by wria
-sc_nlcd_cat_ac_year_wria <- sc_nlcd_cat |> 
-  mutate(
-    across(ends_with("cat"), ~./100*catareasqkm*247.11)
-  ) |> 
-  summarise(
-    across(ends_with("cat"), sum),
-    .by = c(nlcd_year, wria, wria_nr_nm)
-  ) |> 
-  pivot_longer(-c(nlcd_year,wria,wria_nr_nm), names_to = "nlcd_class", values_to = "ac") |> 
-  mutate(nlcd_class = str_remove(nlcd_class, "cat"))
-
-##statewide totals by nlcd_year
-# #as statewide pct; think this may be more misleading than helpful
-# sc_nlcd_cat_ac_year_wria |> 
-#   summarise(ac = sum(ac), .by = c(nlcd_year, nlcd_class)) |> 
-#   mutate(pct = ac/sum(ac), .by = nlcd_year) |> 
-#   ggplot() + 
-#   geom_col(aes(nlcd_year, pct, fill = nlcd_class, color = nlcd_class), show.legend = F) +
-#   facet_wrap(~nlcd_class)
-#as abs acres
-sc_nlcd_cat_ac_year_wria |> 
-  summarise(ac = sum(ac), .by = c(nlcd_year, nlcd_class)) |> 
-  ggplot() + geom_col(aes(nlcd_year, ac, fill = nlcd_class, color = nlcd_class), show.legend = F) +
-  scale_y_continuous(labels = scales::comma) +
-  facet_wrap(~nlcd_class, scales = "free")
-#acres, urban only; did not expect to see decline in urbop
-#but major potential conflation with other class switches
-sc_nlcd_cat_ac_year_wria |> 
-  filter(str_detect(nlcd_class, "urb")) |> 
-  summarise(ac = sum(ac), .by = c(nlcd_year, nlcd_class)) |> 
-  ggplot() + 
-  geom_col(aes(nlcd_year, ac, fill = nlcd_class, color = nlcd_class), show.legend = F) +
-  scale_color_grey(aesthetics = c("fill","color")) +
-  scale_y_continuous(labels = scales::comma) +
-  facet_wrap(~nlcd_class)
-
-#overall changes across nlcd classes and wrias
-#could calc running diff() but start with 2019-2001
-#this is 'too much' but also useful for narrowing
-#statewide drop in urbop mostly wria 62, 49, 41, 43 --> looks mostly switched into urbmd
-#multiwria 22-28 increases in wdwet seem likely timber regrowth given accompanying decreases in bl+mxfst+shrb
-#decrease in wria4 ow points towards misclass artifact, unless baker and ross lakes have really shrunk a lot
-sc_nlcd_cat_ac_year_wria |> 
-  filter(nlcd_year %in% c(2001, 2019)) |> 
-  pivot_wider(names_from = nlcd_year, values_from = ac) |> 
-  mutate(
-    d1901 = `2019`-`2001`,
-    d1901pct = d1901/`2001`
-    ) |> 
-  ggplot() +
-  geom_col(aes(d1901, wria, fill = nlcd_class, alpha = d1901 > 0), show.legend = F) +
-  scale_alpha_manual(values = c(0.3,0.8)) +
-  geom_vline(xintercept = 0) +
-  facet_wrap(~nlcd_class, nrow = 1, scales = "free")
-#another version, harvest and/or fire dominate when the unit is untransformed acres
-#commented lines confirm that all urbhi and urbmd changes are increases
-sc_nlcd_cat_ac_year_wria |> 
-  filter(    
-    str_detect(nlcd_class, "ice|ow", negate = T),
-    nlcd_year %in% c(2001, 2019)
-    ) |> 
-  pivot_wider(names_from = nlcd_year, values_from = ac) |> 
-  mutate(d1901 = `2019`-`2001`) |>
-  select(-c(`2001`,`2019`)) |> 
-  arrange(nlcd_class) |> 
-  #pivot_wider(names_from = nlcd_class, values_from = d1901) |> 
-  ## GGally::ggpairs(columns = 3:16, mapping = aes(size = 0.5, alpha = 0.5))
-  #count(urbhi > 0, urbmd > 0)
-  ggplot() + geom_point(aes(nlcd_class, wria_nr_nm, size = abs(d1901), color = d1901)) + wacolors::scale_color_wa_c("lopez", midpoint = 0)
-
-#per-wria class changes between 2001 and 2019
-#focusing on wria subset
-#these 4 westside all have increased conif & decreased shrb
-sc_nlcd_cat_ac_year_wria |> 
-  filter(    
-    str_detect(nlcd_class, "ice", negate = T),
-    nlcd_year %in% c(2001, 2019)
-    ) |> 
-  pivot_wider(names_from = nlcd_year, values_from = ac) |> 
-  mutate(d1901 = `2019`-`2001`) |> 
-  #filter(wria=="57") |> arrange(d1901) |> 
-  filter(wria %in% c("28","37","49","57", 
-                     "8","9","10","15")) |> 
-  ggplot() +
-  geom_col(aes(nlcd_class, d1901, fill = nlcd_class), show.legend = F) +
-  facet_wrap(~wria_nr_nm, nrow = 2, scales = "free", strip.position = "right")
-
-#can ignore ice and open water and could combine urbhi+urbmd
-#such that prelim cat-vs-rp100 was probably not wildly off for the urban part
-#BUT combining 'tree' types looks much less clean/clear, as shrb/bl etc. vary by wria/region
-#SO due to contrasting directions of change between classes across wrias, 
-#and heterogeneity/conflation of different within-wria locations in wria-total change, 
-#rather than initial approach of aggregating classes and summarizing by wria
-#appears preferable to spatially-focus on comids with a change of interest
-#then examine change in other classes
-
-#orig questions: what's the deficit and how's it changing?
-#"how well is washington's land use regulatory regime working to direct loss of natural cover away from a riparian corridor?"
-
-
-
-### pct-based viz
-#ignoring years, per-wria distrib pct-tree
-sc_nlcd_cat_ac |> 
-  ggplot() + geom_boxplot(aes(tree_cat, fct_reorder(wria, tree_cat)), varwidth = T)
-#ignoring years, contrasting rp100 vs wria-wide
-sc_nlcd_cat_ac |> 
-  select(comid, nlcd_year, wria, tree_cat, tree_catrp100) |> 
-  pivot_longer(cols = contains("tree"), values_to = "pct") |> 
-  ggplot() + geom_boxplot(aes(pct, fct_reorder(wria, pct), color = name), varwidth = T)
-#ignoring years, per-wria distrib of per-local spatial diff riparian-vs-whole
-#positive: %treed in riparian corr greater than local catch as whole
-#but these distributions of differences ignore 'starting point' of higher/lower pcts
-sc_nlcd_cat_ac |> 
-  select(comid, nlcd_year, wria, tree_cat, tree_catrp100) |> 
-  mutate(d_tree = tree_catrp100 - tree_cat) |> 
-  ggplot() + geom_boxplot(aes(d_tree, fct_reorder(wria, d_tree)), varwidth = T)
-#so ordinate diffs by riparian treed
-#within each nlcd_year, d_tree>0 indicates locally 'relatively-more-treed-than-overall' riparian for a given level of %treed
-#larger d_tree at larger tree_catrp suggests more 'green ribbon'-like conditions with untreed upland
-sc_nlcd_cat_ac_dtree <- sc_nlcd_cat_ac |> 
-  filter(nlcd_year %in% c(2001, 2019)) |> 
-  select(comid, nlcd_year, wria, tree_cat, tree_catrp100) |> 
-  mutate(d_tree = tree_catrp100 - tree_cat) 
-sc_nlcd_cat_ac_dtree |> 
-  ggplot() + geom_point(aes(tree_catrp100, d_tree, color = factor(nlcd_year)), alpha = 0.1, size = 0.2) +
-  annotate("segment", x = 0.05, y = -1.05, xend = 0.95, yend = -1.05, arrow = arrow()) +
-  annotate("text", x = 0.15, y = -1, label = "higher riparian %tree cover", hjust = 0) +
-  annotate("segment", x = -0.05, y = -1.05, xend = -0.05, yend = 1.05, arrow = arrow()) +
-  annotate("text", x = -0.01, y = 0.5, label = "greater difference \nriparian vs whole-cat %tree cover", hjust = 0) +
-  wacolors::scale_color_wa_d() +
-  facet_wrap(~nlcd_year)
-#following is difficult to intuit...
-#calc'd as temporal diff in spatial diff: (rip19-cat19) - (rip01-cat01)
-# best-case? positive d19 is more positive than a negative or positive d01?
-sc_nlcd_cat_ac_dtree |> 
-  pivot_wider(names_from = nlcd_year, values_from = contains("tree")) |> 
-  mutate(`d_tree_2019-2001` = d_tree_2019 - d_tree_2001) |> 
-  ggplot() +
-  geom_point(aes(d_tree_2019, `d_tree_2019-2001`, size = tree_catrp100_2019, color = wria), alpha = 0.1, show.legend = F) +
-  scale_size_area()
-#spatial-diff ordinated t2 vs t1
-sc_nlcd_cat_ac_dtree |> 
-  pivot_wider(names_from = nlcd_year, values_from = contains("tree")) |> 
-  ggplot() +
-  geom_point(aes(d_tree_2001, d_tree_2019, size = tree_catrp100_2019, color = wria), alpha = 0.2, show.legend = F)
-#best of a dubious bunch? calc then ordinate each temporal diff per spatial-extent
-sc_nlcd_cat_ac_dtree |> 
-  pivot_wider(names_from = nlcd_year, values_from = contains("tree")) |> 
-  mutate(
-    d_cat_1901 = tree_cat_2019 - tree_cat_2001,
-    d_catrp100_1901 = tree_catrp100_2019 - tree_catrp100_2001
-  ) |> 
-  ggplot() +
-  geom_point(aes(d_cat_1901, d_catrp100_1901, size = tree_catrp100_2019, color = wria), alpha = 0.2, show.legend = F) +
-    annotate("segment", x = -1, y = -1.05, xend = 1, yend = -1.05, arrow = arrow()) +
-  annotate("text", x = 0, y = -.95, label = "greater whole local catchment\n %tree in 2019 vs 2001", hjust = 0) +
-  annotate("segment", x = -1.05, y = -1, xend = -1.05, yend = 1, arrow = arrow()) +
-  annotate("text", x = -1, y = 0.85, label = "greater riparian %tree cover in 2019 vs 2001", hjust = 0)
-
-#urban flipside, sort of interesting to see in the same 'unit space'?
-#but still visually compromised by not having 'starting point' in the picture
-#such that +5% between years means very different things from 75% vs 0%
-sc_nlcd_cat_ac |> 
-  filter(nlcd_year %in% c(2001, 2019)) |> 
-  select(comid, nlcd_year, wria, urb_cat, urb_catrp100) |> 
-  pivot_wider(names_from = nlcd_year, values_from = contains("urb")) |> 
-  mutate(
-    d_cat_1901 = urb_cat_2019 - urb_cat_2001,
-    d_catrp100_1901 = urb_catrp100_2019 - urb_catrp100_2001
-  ) |> 
-  ggplot() +
-  geom_point(aes(d_cat_1901, d_catrp100_1901, size = urb_catrp100_2019, color = wria), alpha = 0.2, show.legend = F) +
-    annotate("segment", x = -1, y = -1.05, xend = 1, yend = -1.05, arrow = arrow()) +
-  annotate("text", x = 0, y = -.95, label = "greater whole local catchment\n %urban in 2019 vs 2001", hjust = 0) +
-  annotate("segment", x = -1.05, y = -1, xend = -1.05, yend = 1, arrow = arrow()) +
-  annotate("text", x = -1, y = 0.85, label = "greater riparian %urban cover in 2019 vs 2001", hjust = 0)
-
-#segments better than points
-#steeper/more vertical indicates greater riparian increase than encompassing
-#versus flatter for surrounding increases without riparian
-wrias <- as.character(c(1,7,8,10,15, 28,32,37,45,57))
-#define comids with non-zero urban cover in final NLCD year; could threshold to larger %
-#drop second filter condition if not focusing the tree change on only those comids with +urban
-#first look showed qualitatively similar and just including many more 'rural' cats
-#further below created vector of 'urban in rp100' comids to limit even more
-comid_2019_urb <- sc_nlcd_cat_ac |> 
-  #ggplot() + stat_ecdf(aes(urbmdcat + urbhicat, color = factor(nlcd_year)))
-  #summarise(q = quantile(urbmdcat + urbhicat, p = 0.75), .by = nlcd_year)
-  filter(nlcd_year == 2019, (urbmdcat + urbhicat > 0)) |> 
-  pull(comid)
-
-{
-  sc_nlcd_cat_ac |> 
-    filter(nlcd_year %in% c(2001, 2019), comid %in% comid_2019_urb) |> 
-    select(comid, nlcd_year, wria, wria_nr_nm,
-           starts_with("urb_")) |> 
-    pivot_wider(names_from = nlcd_year, values_from = contains("cat")) |>
-    mutate(
-      d_cat = urb_cat_2019 - urb_cat_2001,
-      d_catrp100 = urb_catrp100_2019 - urb_catrp100_2001
-    ) |> 
-    filter(wria %in% wrias) |> 
-    ggplot() + 
-    geom_segment(aes(
-      x = urb_cat_2001, y = urb_catrp100_2001,
-      xend = urb_cat_2019, yend = urb_catrp100_2019,
-      color = d_cat - d_catrp100 
-    ),
-    arrow = arrow(length = unit(0.05,"npc")),
-    show.legend = T) +
-    geom_abline(slope = 1, intercept = 0, linetype = 3) +
-    wacolors::scale_color_wa_c("lopez", midpoint = 0) +
-    scale_x_continuous(labels = scales::percent) +
-    scale_y_continuous(labels = scales::percent) +
-    facet_wrap(~wria_nr_nm, ncol = 1, strip.position = "right") +
-    theme(strip.text = element_text(size = 5), legend.position = "top") +
-    labs(
-      title = "2001 to 2019 urban cover change",
-      subtitle = "StreamCat NLCD %urban high+medium",
-      x = "whole local catchment",
-      y = "100m riparian corridor %urban"
-    )
-}+{
-  sc_nlcd_cat_ac |> 
-    filter(nlcd_year %in% c(2001, 2019), comid %in% comid_2019_urb) |> 
-    select(comid, nlcd_year, wria, wria_nr_nm,
-           starts_with("tree_")) |> 
-    pivot_wider(names_from = nlcd_year, values_from = contains("cat")) |>
-    mutate(
-      d_cat = tree_cat_2019 - tree_cat_2001,
-      d_catrp100 = tree_catrp100_2019 - tree_catrp100_2001
-      , 
-      d_catrp100f = case_when(
-        d_catrp100 < 0 & d_cat < 0 ~ "both dec",
-        d_catrp100 >= 0 & d_cat >= 0 ~ "both inc",
-        d_catrp100 < 0 & d_cat >= 0 ~ "rp100 dec",
-        d_catrp100 >= 0 & d_cat < 0 ~ "cat dec"
-      )
-    ) |>
-    filter(wria %in% wrias) |> 
-    #filter(d_catrp100f=="rp100 dec") |> summarise(across(contains("ac_"), sum), .by = wria_nr_nm)
-    summarise(across(contains("ac_"), sum), .by = c(d_catrp100f, wria_nr_nm)) |> 
-    mutate(
-      d_cat_ac = tree_cat_ac_2019 - tree_cat_ac_2001,
-      d_catrp100_ac = tree_catrp100_ac_2019 - tree_catrp100_ac_2001
-    ) |> 
-    select(wria_nr_nm, d_catrp100f, contains("cat_"), contains("catrp100_")) |> 
-    arrange(wria_nr_nm, d_catrp100f) |> 
-    gt(groupname_col = "wria_nr_nm", rowname_col = "d_catrp100f") |> fmt_number(decimals = 0) |> 
-    tab_style_body(fn = \(x){x<0}, style = cell_text(color = "red"))
-  ggplot() + 
-    geom_segment(aes(
-      x = tree_cat_2001, y = tree_catrp100_2001,
-      xend = tree_cat_2019, yend = tree_catrp100_2019,
-      color = d_catrp100
-    ),
-    arrow = arrow(length = unit(0.05,"npc")),
-    show.legend = T) +
-    geom_abline(slope = 1, intercept = 0, linetype = 3) +
-    wacolors::scale_color_wa_c("stuart", midpoint = 0) +
-    scale_x_continuous(labels = scales::percent) +
-    scale_y_continuous(labels = scales::percent) +
-    facet_wrap(~wria_nr_nm+d_catrp100f, ncol = 4, 
-               labeller = label_wrap_gen(multi_line = F),
-               strip.position = "right") +
-    theme(strip.text = element_text(size = 5), legend.position = "top") +
-    labs(
-      title = "2001 to 2019 tree cover change",
-      subtitle = "StreamCat NLCD %confi+decid+mxfst; comids with urban > 0 in 2019",
-      x = "whole local catchment",
-      y = "100m riparian corridor %tree"
-    )
-} + 
-  plot_layout(widths = c(1,4)/5,guides = "keep")
-
-#increased riparian urban cover is not exclusively correlated with decreased tree cover
-sc_nlcd_cat_ac |> 
-  filter(nlcd_year %in% c(2001, 2019), comid %in% comid_2019_urb) |> 
-  select(comid, nlcd_year, wria, wria_nr_nm,
-         starts_with("urb_") & ends_with("ac"),
-         starts_with("tree_") & ends_with("ac")
-         ) |> 
-  pivot_wider(names_from = nlcd_year, values_from = contains("cat")) |>
-  mutate(
-    d_cat_ac_urb = urb_cat_ac_2019 - urb_cat_ac_2001,
-    d_cat_ac_tree = tree_cat_ac_2019 - tree_cat_ac_2001,
-
-    d_catrp100_ac_urb = urb_catrp100_ac_2019 - urb_catrp100_ac_2001,
-    d_catrp100_ac_tree = tree_catrp100_ac_2019 - tree_catrp100_ac_2001
-  ) |> 
-  filter(wria %in% wrias) |> 
-  ggplot() +
-  geom_point(aes(d_catrp100_ac_urb, d_catrp100_ac_tree, color = wria), alpha = 0.5, size = 0.5, show.legend = F) +
-  geom_smooth(aes(d_catrp100_ac_urb, d_catrp100_ac_tree, color = wria), show.legend = F) +
-  geom_hline(yintercept = 0) +
-  facet_wrap(~wria, nrow = 2, scales = "free") +
-  labs(
-    title = "Increased riparian urban cover is not exclusively correlated with decreased tree cover",
-    subtitle = "StreamCat NLCD 2019-2001, comids with non-zero urban in 2019")
-
-#what changes where urban increases?
-#focus first on locations with nonzero RP100 urban in 2019
-comid_2019_urb_rp100 <- sc_nlcd_cat_ac |> 
-  filter(nlcd_year == 2019, (urbmdcatrp100 + urbhicatrp100 > 0)) |> 
-  pull(comid)
-
-
-sc_nlcd_cat_ac |> 
-  filter(nlcd_year %in% c(2001, 2019), comid %in% comid_2019_urb_rp100) |> 
-  select(wria, wria_nr_nm, comid, nlcd_year, contains("rp100") & ends_with("_ac")) |> 
-  #filter(nlcd_year==2019) |> summary()
-  pivot_longer(-c(wria, wria_nr_nm, comid, nlcd_year), names_to = "nlcd_class") |> 
-  pivot_wider(names_from = nlcd_year,
-              #names_prefix = "nlcd_", 
-              values_from = value) |> 
-  mutate(d = `2019` - `2001`) |> #mutate(d = nlcd_2019 - nlcd_2001) |> 
-  # pivot_wider(names_from = name, values_from = c(d, `2019`, `2001`)) |> 
-  filter(
-    str_detect(nlcd_class, "urb_|tree_", negate = T),
-    `2001`+`2019` > 0 #drop classes with zero cover both year
-    ) |> 
-  #ignore classes with no change in comid
-  filter(abs(d) > 0) |> 
-  filter(wria == "15") |> 
-  # #big change comids
-  filter(abs(d) < 50) |> 
-  # #focal comids with larger urb gains
-  # filter(nlcd_class == "urbmdcatrp100_ac", d > 10) |> pull(comid) -> urbmdgain
-  ggplot() +
-  # # #quasi heatmap
-  # # geom_point(aes(fct_reorder(comid, d, min), nlcd_class, color = d)) +
-  # # scale_color_gradient2(midpoint = 0) +
-  # # scale_size_area(max_size = 4) +
-  # #rotated parallel coord
-  # geom_point(aes(nlcd_class, d, group = comid, color = nlcd_class), size = 0.6, show.legend = F) +
-  # geom_line(aes(nlcd_class, d, group = comid), linewidth = 0.1, alpha = 0.3) +
-  # coord_flip() +
-  #problem with 'avg' change per class is that it blends different comid-specific shifts?
-  geom_vline(xintercept = 0) +
-  geom_jitter(aes(d, nlcd_class, color = nlcd_class), size = 0.5, alpha = 0.5, show.legend = F) +
-  geom_boxplot(aes(d, nlcd_class, color = nlcd_class), fill = NA, varwidth = T, outliers = F, show.legend = F) +
-  scale_color_manual(values = pal_nlcd) +
-  facet_wrap(~wria, scales = "free_x") +
-  theme(panel.grid = element_blank()) 
-
-#closer look at 2 big rp100 changes, gain conif lose shrb
-x <- sf_cat |> filter(comid %in% c("23990429", "24288108"))
-y <- sf_flw |> filter(comid %in% c("23990429", "24288108")) |> st_buffer(dist = 300)
-mapview(x) + mapview(y) 
-#just E of Tahuya SF and E of Union R outlet, rp100 looks more S in cat, E of 'carney lake'
-#plainly some regrowth of cut patches between 2001 and 2019 for 24288108
-#and for 23990429, appears to be 
-#https://earthengine.google.com/timelapse#v=47.46993,-122.80657,11.104,latLng&t=3.53&ps=50&bt=19840101&et=20221231
-
-d <- sc_nlcd_cat_ac |> 
-  filter(comid %in% urbmdgain) |> 
-  select(wria, wria_nr_nm, comid, nlcd_year, contains("rp100") & ends_with("_ac")) |> 
-  pivot_longer(-c(wria, wria_nr_nm, comid, nlcd_year), names_to = "nlcd_class") |> 
-  filter(str_detect(nlcd_class, "ice|urb_|tree_", negate = T)) |> 
-  arrange(comid, nlcd_year, desc(nlcd_class))
-{d |> 
-  ggplot(aes(nlcd_year, value, color=nlcd_class, fill=nlcd_class, group = comid)) +
-  geom_col() +
-  scale_color_manual(values = pal_nlcd, aesthetics = c("color","fill")) +
-  facet_wrap(~comid, ncol = 1, scales = "free") + labs(y = "acres")
-}+{
-  d |> 
-  ggplot(aes(nlcd_year, value, color=nlcd_class, fill=nlcd_class, group = nlcd_class)) +
-  geom_line(show.legend = F) +
-  scale_color_manual(values = pal_nlcd, aesthetics = c("color","fill")) +
-  facet_wrap(~comid, ncol = 1, scales = "free") + labs(y = "acres")
-} + plot_layout(guides = "keep")
-
-#turns out to be N Bremerton, making the 'densification' plausible
-x <- sf_cat |> filter(comid %in% c("23989097"))
-y <- sf_flw |> filter(comid %in% c("23989097")) |> st_buffer(dist = 300)
-mapview(x) + mapview(y) 
-
-d |> 
-  filter(
-    nlcd_year %in% c(2001, 2019),
-    comid %in% c("23989097")
-    ) |> 
-  pivot_wider(names_from = nlcd_year, values_from = value) |> 
-  mutate(d = `2019` - `2001`) |> 
-  arrange(desc(d))
-
-#function to plot all-nlcd_class series, passed comid(s) as arg
-
-```
-
-```{r SUPERSEDED_BUT_WITH_USEFUL_RP100_cat_d_urb_then_tree, eval=FALSE}
-#wrangle saved list by year to single tibble
-#strip year from colnames, and condensing categories: 
-#focus on urban 'high'+'medium', 4 tree categories 
-#recognize that rp100 is nested rather than spatial difference/set complement when contrasted with encompassing catchment NLCD LU
-sc_urb_tree <- readRDS(file.path(dir_data_common, "streamcat", "sc_wa_nlcd.rds")) |> 
-  map(
-    ~.x |> 
-      rename_with(~str_remove(.,paste(c(2001, 2004, 2006, 2008, 2011, 2013, 2016, 2019),collapse = "|")) |> 
-                    str_remove("pct")) |> 
-      select(comid, nlcd_year, contains("areasqkm"),
-             contains("urbmd"), contains("urbhi"), 
-             contains("wdwet"), contains("mxfst"), contains("decid"), contains("conif")
-      ) |> 
-      mutate(
-        urb_cat = urbmdcat + urbhicat,
-        urb_ws = urbmdws + urbhiws,
-        tree_cat = wdwetcat + mxfstcat + decidcat + conifcat,
-        tree_ws = wdwetws + mxfstws + decidws + conifws
-        ,
-        urb_catrp100 = urbmdcatrp100 + urbhicatrp100,
-        urb_wsrp100 = urbmdwsrp100 + urbhiwsrp100,
-        tree_catrp100 = wdwetcatrp100 + mxfstcatrp100 + decidcatrp100 + conifcatrp100,
-        tree_wsrp100 = wdwetwsrp100 + mxfstwsrp100 + decidwsrp100 + conifwsrp100
-      ) |> 
-      select(comid, nlcd_year, 
-             contains("areasqkm"), 
-             areasqkm_cat = catareasqkm, areasqkm_ws = wsareasqkm,
-             areasqkm_catrp100 = catareasqkmrp100, areasqkm_wsrp100 = wsareasqkmrp100,
-             ends_with("_cat"), ends_with("_catrp100"),
-             ends_with("_ws"), ends_with("_wsrp100"))
-  ) |> 
-  list_rbind()
-
-#break apart then rejoin to get areas by AOI, duplicated by LC
-sc_urb_tree <- left_join(
-  sc_urb_tree |> 
-    select(comid, nlcd_year, contains("areasqkm")) |> 
-    pivot_longer(cols = -c(comid, nlcd_year), values_to = "areasqkm") |> 
-    mutate(aoi = str_remove(name, "areasqkm_"), name = NULL)
-  ,
-  sc_urb_tree |> 
-    select(comid, nlcd_year, contains("urb"),contains("tree")) |> 
-    pivot_longer(cols = -c(comid, nlcd_year), values_to = "pct") |> 
-    separate(name, c("lc", "aoi")) |> 
-    mutate(pct = round(pct/100, 4))
-  ,
-  by = c("comid", "nlcd_year", "aoi")
-)
-
-#per-nlcd-year 'spatial diff' of whole-cat-pct vs/minus riparian-pct
-#positive indicating higher proportion of riparian 'urban' or treed
-#random testing shows 'urban' can be roads...often near water
-cat_d <- sc_urb_tree |> 
-  mutate(acres = 247.11 * areasqkm * pct) |>
-  filter(str_detect(aoi,"cat")) |> 
-  pivot_wider(names_from = aoi, values_from = c(areasqkm, pct, acres)) |> 
-  arrange(comid, nlcd_year)
-
-#### urban ---------
-
-# cat_d |> 
-#   filter(str_detect(lc,"urb")) |> 
-#   mutate(
-#     # d_pct = pct_cat - pct_catrp100,
-#     # d_acres = acres_cat - acres_catrp100
-#     prop_rp100 = acres_catrp100 / acres_cat
-#   )
-
-#first look statewide, indicating that at least in some coarse sense,
-#regulations have been steering 'urban' away from the riparian corridor 
-cat_d |> 
-  filter(str_detect(lc,"urb")) |> 
-  summarise(
-    across(starts_with("acres"), ~sum(., na.rm = T)),
-    .by = c(lc, nlcd_year)
-  ) |> 
-  pivot_longer(cols = starts_with("acres"), names_to = "aoi", values_to = "acres") |> 
-  mutate(
-    aoi = if_else(str_detect(aoi, "rp100"), "Riparian 100m", "Local catchment")
-  ) |> 
-  ggplot() + 
-  geom_col(aes(nlcd_year, acres, fill = aoi)) + 
-  scale_fill_grey("Extent") +
-  scale_y_continuous(labels = scales::comma) +
-  labs(
-    title = "Urban land cover, total vs riparian corridor",
-    subtitle = "Sum of NLCD urban 'medium' and 'high' classes in StreamCat NHDplus 1:100K"
-    )
-
-cat_d_urb_wria <- sf_flw |> 
-  as_tibble() |> 
-  select(-fcode, -geometry) |> 
-  distinct(comid, .keep_all = T) |> #enforce a single wria per comid
-  inner_join(filter(cat_d, str_detect(lc,"urb")), by = "comid") |> 
-  # #summary()
-  # ##comids with NA wria are border edges
-  # filter(is.na(wria)) |> distinct(comid) -> no_wria
-  # semi_join(sf_flw, no_wria, by = "comid") |> ggplot() + geom_sf(aes(fill = fcode))
-  drop_na(wria) |> 
-  summarise(
-    across(c(lengthkm, starts_with("acres")), ~sum(., na.rm = T)),
-    .by = c(lc, nlcd_year, wria, wria_nr_nm)
-  )
-
-#geom_col by WRIA, abs area per cat/catrp100
-cat_d_urb_wria |> 
-  pivot_longer(cols = starts_with("acres"), names_to = "aoi", values_to = "acres") |> 
-  mutate(
-    aoi = if_else(str_detect(aoi, "rp100"), "Riparian 100m", "Local catchment")
-  ) |> 
-  ggplot() +
-  geom_col(aes(nlcd_year, acres, fill = aoi)) + 
-  scale_fill_grey("Extent") +
-  scale_y_continuous(labels = scales::comma) +
-  facet_wrap(~wria, scales = "free_y")
-
-#geom_line by WRIA: total urban, riparian corridor urban, and riparian as proportion of total
-d <- cat_d_urb_wria |>
-  mutate(riparian_proportion_of_total = acres_catrp100 / acres_cat)
-d |> arrange(desc(riparian_proportion_of_total))
-
-{
-  ggplot(d) +
-    geom_line(aes(nlcd_year, acres_cat, group = wria), color = "grey20", linewidth = 0.2) + 
-    geom_smooth(aes(nlcd_year, acres_cat), color = "grey20", linewidth = 1.5, linetype = 2) + 
-    scale_y_continuous(labels = scales::comma) +
-    #facet_wrap(~wria, ncol = 1, strip.position = "right") +
-    labs(subtitle = "Total urban extent has increased...")
-  }+{
-    ggplot() +
-      geom_line(data = d, aes(nlcd_year, acres_catrp100, group = wria), color = "grey70", linewidth = 0.3) + 
-      geom_smooth(data = d, aes(nlcd_year, acres_catrp100), color = "grey70", linewidth = 1.5, linetype = 2) + 
-      geom_text(data = filter(d, nlcd_year == 2019),
-                x = 2019.5, aes(y = acres_catrp100, label = wria), color = "grey70", size = 2) + 
-      scale_y_continuous(labels = scales::comma) +
-      #facet_wrap(~wria, ncol = 1, strip.position = "right") +
-      labs(subtitle = "and so has urban cover in a 100m riparian corridor\n around major streams and rivers...")
-  }+{
-    ggplot() +
-      geom_line(data = d, aes(nlcd_year, riparian_proportion_of_total, group = wria), color = "orange") + 
-      geom_smooth(data = d, aes(nlcd_year, riparian_proportion_of_total), color = "orange", linewidth = 1.5, linetype = 2) + 
-      geom_text(data = filter(d, nlcd_year == 2019),
-                x = 2019.5, aes(y = riparian_proportion_of_total, label = wria), color = "orange", size = 2) +
-      scale_y_continuous(labels = scales::percent) +
-      #facet_wrap(~wria, ncol = 1, strip.position = "right") +
-      labs(subtitle = "\nbut mostly at a flat or slower rate")
-  } + plot_layout(nrow = 1, guides = "collect")
-
-#geom_sf single wria catchments in time
-sf_cat |> 
-  filter(wria=="16") |>
-  distinct(comid, .keep_all = T) |> #enforce a single wria per comid
-  inner_join(
-    cat_d |> 
-      filter(str_detect(lc,"urb")) 
-    , by = "comid") |>
-  select(comid, contains("wria"), nlcd_year, contains("cat")) |> 
-  pivot_longer(cols = starts_with("acres"), values_to = "ac") |> 
-  ggplot() +
-  geom_sf(aes(fill = ac), color = NA) +
-  scale_fill_gradient(low = "tan",high = "grey30") +
-  facet_wrap(~name+nlcd_year, nrow = 2)
-
-#### tree ---------
-cat_d |> 
-  filter(str_detect(lc,"tree")) |> 
-  summarise(
-    across(starts_with("acres"), ~sum(., na.rm = T)),
-    .by = c(lc, nlcd_year)
-  ) |> 
-  pivot_longer(cols = starts_with("acres"), names_to = "aoi", values_to = "acres") |> 
-  mutate(
-    aoi = if_else(str_detect(aoi, "rp100"), "Riparian 100m", "Local catchment")
-  ) |> 
-  ggplot() + 
-  geom_col(aes(nlcd_year, acres, fill = aoi)) + 
-  scale_fill_manual(name = "Extent", values = c("palegreen","darkgreen")) +
-  scale_y_continuous(labels = scales::comma) +
-  #scale_y_log10() +
-  labs(
-    title = "Tree cover, total vs riparian corridor",
-    subtitle = "Sum of NLCD tree/forest classes in StreamCat NHDplus 1:100K"
-    )
-
-#statewide boxplot of per-comid pct-tree-riparian by nlcd year
-#jitter renders useless
-cat_d |> 
-  filter(str_detect(lc,"tree")) |> 
-  mutate(nlcd_year = factor(nlcd_year)) |> 
-  ggplot(aes(nlcd_year, pct_catrp100)) +
-  geom_boxplot(color = "darkgreen") +
-  geom_jitter(color = "darkgreen", alpha = 0.3, size = 0.2)
-#coarse regional stratification is perhaps more interesting
-#east-of-cascades relatively consistent decline vs rebound west-side
-sf_flw |> 
-  as_tibble() |> 
-  select(-fcode, -geometry) |> 
-  distinct(comid, .keep_all = T) |> #enforce a single wria per comid
-  inner_join(filter(cat_d, str_detect(lc,"tree")), by = "comid") |> 
-  drop_na(wria) |> 
-  mutate(
-    nlcd_year = factor(nlcd_year),
-    ew = if_else(as.integer(as.character(wria)) > 25, "east", "west")
-    ) |> 
-  ggplot(aes(nlcd_year, pct_catrp100)) +
-  geom_jitter(color = "darkgreen", alpha = 0.2, size = 0.1) +
-  geom_boxplot(fill = NA, color = "black") +
-  facet_wrap(~ew, nrow = 1)
-
-#going brightening fishing: did any catchments that gained urban cover also increase riparian tree cover?
-cat_d |> 
-  drop_na(pct_catrp100) |> 
-  filter(
-    nlcd_year %in% c(2001, 2019)
-    ) |>
-  select(-contains("areasqkm")) |> 
-  pivot_wider(names_from = c(nlcd_year, lc), values_from = contains("cat")) |> 
-  mutate(
-    d_cat_urb = pct_cat_2019_urb - pct_cat_2001_urb,
-    d_catrp100_tree = pct_catrp100_2019_tree - pct_catrp100_2001_tree
-  ) |> 
-  filter(
-    d_cat_urb > 0
-  ) |> 
-  ggplot(aes(d_cat_urb, d_catrp100_tree)) +
-  geom_point(aes(color = d_catrp100_tree > 0), size = 0.1, alpha = 0.3, show.legend = F) +
-  scale_color_manual(values = c("grey30","darkgreen")) +
-  labs(
-    x = "Difference in local catchment %urban cover, 2019-2001",
-    y = "Difference in %tree cover of 100m riparian corridor, 2019-2001",
-    title = "Some urban land cover increases were concurrent with increased riparian tree cover"
-  )
-
-focal <- cat_d |> 
-  drop_na(pct_catrp100) |> 
-  filter(
-    nlcd_year %in% c(2001, 2019)
-    ) |>
-  select(-contains("areasqkm")) |> 
-  pivot_wider(names_from = c(nlcd_year, lc), values_from = contains("cat")) |> 
-  mutate(
-    d_cat_urb = pct_cat_2019_urb - pct_cat_2001_urb,
-    d_catrp100_tree = pct_catrp100_2019_tree - pct_catrp100_2001_tree
-  ) |> 
-  filter(
-    d_cat_urb > 0,
-    d_catrp100_tree > 0
-    )
-
-#moving fast
-ggplot() + 
-  geom_sf(
-    data = inner_join(sf_cat, focal, by = "comid"),
-    aes(fill = d_cat_urb), color = NA
-    ) +
-  wacolors::scale_fill_wa_c("volcano", reverse = T) +
-  geom_sf(
-    data = inner_join(sf_flw, focal, by = "comid"),
-    aes(color = d_catrp100_tree)
-    ) +
-  wacolors::scale_color_wa_c("foothills", reverse = T)
-
 ```
 
 
