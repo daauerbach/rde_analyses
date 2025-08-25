@@ -478,7 +478,7 @@ wa_imp <- rde_cnty |>
   ) 
 ```
 
-The results presented are based on the area (acreage) of the full "riparian corridor" constituted by the sum of the RMZ, EOW, and floodplain polygons associated with each RDE reach unit. Stratification by county refers to the area within geographic boundaries rather than the jurisdictional extent of county governance. Values within these geographic boundaries reflect various combinations of federal, tribal, state, and incorporated municipal regulatory regimes, and do not follow from the actions of a single managing authority.
+The results presented here are based on the full "riparian corridor" constituted by the sum of the RMZ, EOW, and floodplain polygons associated with each RDE reach unit. Stratification by county refers to the area within geographic boundaries rather than the jurisdictional extent of county governance. Values within these geographic boundaries reflect various combinations of federal, tribal, state, and incorporated municipal regulatory regimes, and are not due to the actions of a single managing authority.
 
 At the full statewide scale, `r round(0.4*wa_imp$nonfstry_impv_inc_ac)` hectares of new impervious cover were added during 2011-2017 (table NNNN; `r round(wa_imp$nonfstry_impv_inc_ac)`). This corresponded to `r wa_imp$imp_pct_reach_ac` of the `r round(0.4*wa_imp$reach_ac)` total reach hectares, and annual increase of `r wa_imp$ha_y` ha (`r wa_imp$ac_y` acres).
 
@@ -509,7 +509,7 @@ rde_cnty |>
 
 ```
 
-The size distribution of individual increases showed that most changes were small, with nearly 95% less than 0.4ha (1ac) and a median of `r 0.4*0.06` ha (0.06ac), considerably less than the 900m^2 area of a single 30m pixel. This pattern was broadly consistent across portions of the state with more and less total increase (fig NNN). 
+Most individual changes were small, with nearly 95% less than 0.4ha (1ac) and a median increase of `r 0.4*0.06` ha (0.06ac, as the intersection of HRCD and RDE polygons), considerably less than the 900m^2 area of a single 30m pixel. This pattern was broadly consistent across portions of the state with more and less total increase (fig NNN map/column panels). 
 
 ```{r gg_rde_cnty_per_reach_imp_inc}
 # rde_cnty |> 
@@ -541,7 +541,7 @@ rde_cnty |>
 
 ```
 
-Total increases varied considerably among county boundary extents, with the largest aggregate and normalized additions concentrated in more heavily urbanized portions of the state, particularly central and south Puget Sound. Congruent with expectations, increases were greatest in proximity to the large and rapidly growing metropolitan areas of Seattle, Tacoma and Vancouver in western Washington and Spokane and Tri-Cities in the east.
+Total increases varied considerably among county boundary extents, with the largest additions concentrated in more heavily urbanized portions of the state, particularly central and south Puget Sound. Congruent with expectations, increases were greatest in proximity to the large and rapidly growing metropolitan areas of Seattle, Tacoma and Vancouver in western Washington and Spokane and Tri-Cities in the east.
 
 ```{r gg_nonfstry_impv_inc_ac_per_100ac_col}
 
@@ -582,7 +582,7 @@ Total increases varied considerably among county boundary extents, with the larg
 
 ```
 
-Examining reach-area normalized versus total increase highlighted differences in the relative density of new impervious cover, with some instances experiencing similar additions within half or a quarter of the overall riparian extent.
+Examining reach-area normalized change versus total aggregate increase highlighted differences in the relative density of new impervious cover (figure NNN scatter panels). Higher per-unit area rates in several instances followed from similar impervious additions that occurred within smaller overall riparian corridor extents.
 
 ```{r gg_nonfstry_impv_inc_ac_per_100ac_vs_abs}
 {
@@ -609,7 +609,7 @@ rde_cnty_sum_impv |>
 }
 ```
 
-Patterns of reach-area normalized increase versus total housing unit change also showed that comparable housing gains were associated with considerable differences in new riparian impervious cover.
+Similarly, when examined relative to total housing unit change during the same 2011-2017 time period, considerable differences in the reach-area normalized impervious increase were evident between county boundaries. This comparison indicates only general patterns in the configuration of land cover conversion because changes included various anthropogenic causes such as roads, warehouses, etc., and were not restricted to residential construction. Nonetheless, the variation in this relationship highlights the potential for housing gains to come at quite divergent costs in riparian condition.
 
 ```{r gg_nonfstry_impv_inc_ac_per_100ac_vs_housing}
 # {
@@ -625,13 +625,15 @@ Patterns of reach-area normalized increase versus total housing unit change also
 #     y = "total est. impervious increase",
 #     title = "Estimated riparian impervious increases vs total housing unit increase by county") 
 # }/
-  {
+{
 rde_cnty_sum_impv |> 
+    arrange(desc(d_hous)) |> 
   ggplot(aes(d_hous, nonfstry_impv_inc_ac_per_100ac)) +
   geom_point(size = 0.3, show.legend = F) + 
   geom_text(aes(label = cnty), size =3, color = "purple", nudge_y = 0.005) +
   geom_smooth(method = "lm") +
   wacolors::scale_fill_wa_c("volcano", reverse = T, na.value = "pink", aesthetics = c("fill","color")) +
+  scale_x_continuous(breaks = seq(0, 70000, by = 10000), labels = scales::comma) +
   #scale_x_log10(labels = scales::label_log()) + 
   labs(
     x = "OFM 2017-2011 total housing unit change", 
@@ -653,7 +655,7 @@ rde_cnty_sum_impv |>
 
 ```
 
-Finally, at a statewide scale, the distribution of reach-area normalized impervious increase was sharply divergent between portions of the riparian network with any salmon distribution and particularly with Chinook.
+Finally, at a statewide scale, the per-unit-area impervious increase differed sharply relative to the distribution of Pacific salmon as recorded in SWIFD, particularly for portions of the riparian network associated with Chinook (figure NNN swifd-columns). Although total aggregate increases were nearly equivalent between non-salmon and Chinook-associated reaches (427 vs 440 ha, 1068 vs 1100 ac), the overall area of the former was roughly an order of magnitude larger, resulting in a much greater rate of change in the fish-occupied portions. 
 
 ```{r gg_nonfstry_impv_inc_ac_swifd}
 rde_cnty_swifd <- rde_cnty |> 
@@ -704,37 +706,45 @@ pal_swifd_chin <- c("not_salmon" = "tan", "salmon_not_chin" = alpha("salmon", 0.
 
 # Discussion
 
-  We analyzed high resolution land cover change data within an ecologically-grounded riparian extent to quantify the magnitude of new impervious cover in Washington state in the early part of the 21st century. A statewide estimate of `r round(0.4*wa_imp$nonfstry_impv_inc_ac)` (`r round(wa_imp$nonfstry_impv_inc_ac)` acres) during the period from 2011 to 2017 represented `r round(wa_imp$nonfstry_impv_inc_ac / wa_imp$reach_ac, 5)`% of the assessed total area, which encompassed a SPTH200 RMZ and adjacent floodplains. 
+We analyzed high resolution land cover change data within an ecologically-grounded riparian corridor to quantify the magnitude of new impervious area in Washington state during the early part of the 21st century. A statewide estimate of `r round(0.4*wa_imp$nonfstry_impv_inc_ac)` (`r round(wa_imp$nonfstry_impv_inc_ac)` acres) during the period from 2011 to 2017 represented `r round(wa_imp$nonfstry_impv_inc_ac / wa_imp$reach_ac, 5)`% of the total assessed extent, which encompassed a SPTH200 RMZ and adjacent floodplains. This estimate might be viewed simultaneously as a small portion of the entire riparian corridor and as a large new addition to an ecohydrologically sensitive zone in watersheds already subject to extensive alteration.
   
-  This estimate might be viewed as both small, considered as a portion of the total riparian corridor, and large, as new conversion frequently occurring in the context of existing watershed alteration.
-  
-  found the answer to be both "a little", in that individual additions were mostly less than 1ha, and "a lot", in that the cumulative total of many small changes was still appreciable.
+## [Caveats]
 
-In agreement with prior studies at smaller scales and coarser resolution, 
+Riparian buffer dimensions that influence ongoing permitting, timber harvest, and other management actions are far from uniform, with a range of legally stipulated values in state regulations and local critical area ordinances (Folkerts et al. 2020), in addition to the heterogeneity in realized on-the-ground conditions within any particular jurisdiction (Swartz et al 2024). The 200-year Site Potential Tree Height standard in WDFW guidance has policy influence as a formulation of best available science, but it does not necessarily determine the footprint of protected areas. The full riparian corridor examined in this analysis does not represent any specific jurisdiction and is likely to encompass what are frequently narrower or smaller management zones. Accordingly, these results are likely an over-estimate relative to the (highly varied) mosaic of currently binding distances. However, the corridor in this assessment is likely to have hydrologic and ecological significance to in-channel conditions regardless of its legal circumstances, and the RDE RMZ tessellation is itself based on underlying hydrography (NHD) that is missing extensive lengths of the smaller, sometimes intermittent or ephemeral components of drainage networks that significantly contribute to water quantity and quality (Brinkerhoff et al 2024). These factors increase the likelihood that this analysis under-estimates the overall magnitude of functional impacts to aquatic ecosystems due to new impervious cover. 
 
-StreamCat rp100 NLCDurbhimd 11700/18 = 650ac/y?
+In addition to the hydrographic error and that in the site index values on which SPTH200 dimensions are based, some residual error persists in the high resolution change polygons despite their manual review. This composite set of factors prevents a straightforward quantification of uncertainty, but as a coarse indication of possible bounds on these estimates, imposing arbitrary 25% factors yields a range from `r 0.4*0.75*rde_cnty_swifd$nonfstry_impv_inc_ac[3]` to  `0.4*1.25*rde_cnty_swifd$nonfstry_impv_inc_ac[3]` in the total hectares of 2011-17 new impervious cover in Chinook-associated reaches. Even the low end of this range raises questions about whether a "no net loss" standard can have been met: if hundreds of acres of impervious cover are not being removed each year, what actions have offset those that are being added?
 
-- examined extent is not jurisdictional anywhere; buffer dimensions in accordance with those of the SPTH200 standard in guidance are not widely implemented
+Moreover, the addition of upland imperviousness outside of this or any other assessed corridor from 10m to 100m is highly likely to affect riparian and in-channel conditions (i.e., a 30m "buffer" is unlikely to have the same function as part of a continuous forest versus as a distinct strip adjacent to converted land). Beyond site-specific slope and soils factors, the concurrent surrounding watershed context has inevitably shaped our understanding of the functional dimensions that underlie buffer formulations. But the applicability of distance-decay curves likely warrants review as increasing imperviousness continues to alter flow paths (e.g., away from saturation excess and towards infiltration excess dynamics). While an SPTH standard allows for some flexibility to avoid prescribing a single critical area dimension, the basic concept may be invalidated where upland surface alteration has rendered even some multiple of SPTH (2x or 5x etc.) insufficient to perform all desired functions.
 
 
-  - Next steps
-    -Process 2021 1m imperv CCAP/Ecopia to SPTH200?
-    -3DHP RMZs from geomorphically informed SPTH200 
+- east vs west considerations?
+
+
+## [Connections]
+
+These results were broadly in agreement with prior studies at coarser resolutions and/or smaller scales.
+  - Lazarus
+  - StreamCat rp100 NLCDurbhimd 11700/18 = ~650ac/y?
+
+## Next steps
+
+  - Process 2021 1m imperv CCAP/Ecopia to SPTH200?
+
+  - 3DHP RMZs from geomorphically informed SPTH200 
   
   - stormwater tie in(s)? 
 
-  - note that upland impervious extent is highly likely to affect riparian ecohydrology - 100ft means very different things as a narrow strip of evident green vs an hard to distinguish point along a continuous gradient of forest. In addition to site-specific slope and soils factors, encompassing watershed hydrologic condition has inevitably shaped our understanding of the functional dimensions that underlie buffer formulations, but that this context has changed with increasing imperviousness and alteration of flow paths (i.e., away from saturation excess and towards infiltration excess dynamics). While an SPTH standard allows for some flexibility to avoid prescribing a single critical area dimension, the basic concept may be invalidated where upland surface alteration has rendered even some unknown multiple of SPTH (2x or 5x etc.) insufficient to perform all desired functions.
-  
-  - tie in Swartz et al 2024 showing real-world variation in 'fixed width' forest harvest buffers? As related to Folkerts et al 2020 Mapping Critical Areas report?
 
 ## other notes
 
 - RDE/HRCD
+
   - independently verify that HRCD is exclusively 2011-17?
   - presentation of county/larger aggregates that mix reaches with/without floodplain (since no 'zone' attrib in API tables)
   - SWIFD stratification?
   
 - SC/NLCD
+
   - rethink whether d_cat_rp100 are valid: if cat is X% giving 10ac and rp100 is Y% giving 10ac, is 0ac d_cat_rp100 always accurate?
   - micro-acreage filter to exclude possible spurious urbhimd noise in forests/river gravels
   - stratify by bfw within county, either 5/25m akin to Bartz or examine distro and pick percentile values
