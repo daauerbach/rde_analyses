@@ -250,183 +250,82 @@ rde_cnty <- readRDS("~/T/DFW-Team WDFW Watershed Synthesis - data_common/rde/cnt
 ```
 
 
-```{r qaqc_and_hot_take_cnty_impv, include=F, eval=F}
-
-rde_cnty_sum_impv <- rde_cnty |> 
-  summarise(
-    across(
-      #contains("impv"),
-      c(reach_ac, nonfstry_impv_inc_ac, nonfstry_tree_dec_ac),
-      ~sum(., na.rm = T)
-    )
-    , .by = cnty
-  ) |> 
-  mutate(
-    across(
-      starts_with("nonf"),
-      list(
-        per_100ac = ~100*(./reach_ac)
-      )
-    )
-  )
-
-rde_cnty_sum_impv <- rde_cnty_sum_impv |> 
-  left_join(
-    ofm_housing_cnty |> 
-      filter(year %in% c(2011, 2017)) |> 
-      pivot_wider(names_from = year, values_from = total_housing) |> 
-      mutate(d_hous = `2017` - `2011`)
-    ,
-    by = "cnty"
-  )
-
-{
-sf_cnty |> 
-  left_join(rde_cnty_sum_impv, by = "cnty") |> 
-  ggplot() + geom_sf(aes(fill = nonfstry_impv_inc_ac)) + 
-    wacolors::scale_fill_wa_c("volcano", reverse = T, na.value = "pink") +
-    labs(title = "Riparian impervious cover increase 2011-2017", subtitle = "Sum of HRCD estimates within SPTH200 RMZ+EOW")
-}/{
-rde_cnty_sum_impv |> 
-  ggplot() + 
-    geom_col(aes(
-      nonfstry_impv_inc_ac,
-      fct_reorder(cnty, nonfstry_impv_inc_ac),
-      fill = nonfstry_impv_inc_ac)) + 
-    wacolors::scale_fill_wa_c("volcano", reverse = T, na.value = "pink") +
-    labs(y = NULL, x = "acres")
-}+
-  plot_layout(guides = "collect")
-
-
-rde_cnty_sum_impv |> 
-  filter(between(d_hous, 500, 5000)) |> 
-  ggplot(aes(d_hous, nonfstry_impv_inc_ac)) +
-  geom_point(aes(color = nonfstry_impv_inc_ac, 
-                 size = nonfstry_impv_inc_ac), show.legend = F) +
-  geom_smooth() +
-  geom_text(aes(label = cnty), color = "purple", nudge_y = 5, size = 3) +
-  scale_size_area() +
-  #scale_x_log10(labels = scales::label_log()) + 
-  wacolors::scale_color_wa_c("volcano", reverse = T, na.value = "pink") +
-  labs(x = "OFM 2017-2011 total housing unit change", y = "est. impervious increase acres")
-
-rde_cnty_sum_impv |> 
-  select(County = cnty, nonfstry_impv_inc_ac) |> 
-  gt() |> 
-  fmt_number("nonfstry_impv_inc_ac", decimals = 2)
-
-#qaqcing Skagit to better understand how much of this change may be in floodplain (a lot)
-#if 'floodplain' is left selected from Skagit county page, this has largest imp inc of 21ac
-#https://ripariandata.wdfw.wa.gov/reaches/128936102
-filter(rde_cnty, pid == "128936102") |> glimpse() #large floodplain appears to have most HRCD polys
-#if 'floodplain' deselected from Skagit county page, this has largest imp inc of 6ac
-#https://ripariandata.wdfw.wa.gov/reaches/165685545
-filter(rde_cnty, pid == "165685545") |> glimpse() #matches
-
-
-#going to UGA level. unlikely for peer-review mscp other than example/case study
-#975 name strings, many with several UGAs
-rde_cnty |> 
-  count(city_uga_names) |> arrange(desc(n)) |> print(n = 50)
-
-#Sumner looks to have had major new industrial/warehouse footprints on White R bottomlands
-#https://earthengine.google.com/timelapse#v=47.22426,-122.22593,11.665,latLng&t=1.75&ps=50&bt=19840101&et=20221231
-rde_cnty |> 
-  filter(nonfstry_impv_inc_ac > 0) |> 
-  summarise(
-    across(
-      c(reach_ac, nonfstry_impv_inc_ac, nonfstry_tree_dec_ac),
-      ~sum(., na.rm = T)
-    )
-    , .by = c(cnty, city_uga_names)
-  ) |> 
-  arrange(desc(nonfstry_impv_inc_ac))
-
-#some very large reaches, mostly lakes and Columbia with mostly EOW
-rde_cnty |>
-  arrange(desc(reach_ac)) |> select(pid, cnty, ends_with("_ac"))
-#Lk WA is one 28K ac PID: https://ripariandata.wdfw.wa.gov/reaches/148897889
-
-#fed/state/tribal/muni/private cols cannot be used to limit/exclude jurisdictional extents in counties
-#occurrence of some PADUS acreage has little association with impinc
-#likely due to potential for spatial co-occurrence in single reach
-#possible that some new impervious "on/in" protected area
-#but also possible and perhaps more probable that large reaches contain spatially nonintersecting both
-#all PADUS cols either NA or numeric per reach, such that is.na(federal_ac) 
-rde_cnty |> 
-  #drop_na(federal_ac) |> filter(is.na(state_ac) | is.na(tribal_ac) | is.na(municipal_ac) | is.na(private_ngo_ac))
-  mutate(has_padus_ac = !is.na(federal_ac)) |> 
-  summarise(
-    across(
-      c(reach_ac, nonfstry_impv_inc_ac, nonfstry_tree_dec_ac),
-      ~sum(., na.rm = T)
-    )
-    , .by = c(has_padus_ac)
-  ) |> 
-  mutate(
-    across(starts_with("nonf"), list(pct = ~./reach_ac))
-  )
-
-#little association of imperv to PADUS for reaches with both
-#neither clear positive corr suggesting more impinc in larger reaches
-#nor clear negative corr signaling less impinc
-rde_cnty |> 
-  filter(nonfstry_impv_inc_ac > 0) |> #7541
-  select(pid, cnty, swifd_any,
-         nonfstry_impv_inc_ac,
-         federal_ac:tribal_ac
-         ) |> 
-  pivot_longer(
-    federal_ac:tribal_ac, names_to = "auth", values_to = "ac"
-  ) |> 
-  filter(ac > 0) |> #distinct(pid) #2540 of 7541 with nonzero impinc && nonzero PADUSac
-  filter(ac < 1000) |> #exclude some big EOW/floods to see better
-  ggplot(aes(ac, nonfstry_impv_inc_ac, color = auth)) +
-  geom_point(alpha = 0.3, size = 0.3, show.legend = F) +
-  scale_x_log10() +
-  scale_y_log10() +
-    facet_wrap(~auth, scales = "free")
-
-
-```
-
-
-## OFM Housing
+## OFM population and housing data
 
 Annual county-level housing units were accessed from the Washington Office of Financial Management (OFM) Data and Research [April 1 Postcensal Estimates](https://ofm.wa.gov/washington-data-research/population-demographics/population-estimates/historical-estimates-april-1-population-and-housing-state-counties-and-cities). These data 
 
-```{r ofm_housing_cnty}
+```{r ofm_pop}
+#non-numeric special symbol flag cols starting after 1970
+#flag==1 is the total of unincorporated (2) and incorp (3), incorp the sum of munis (4)
+ofm_pop <- suppressMessages(readxl::read_excel(
+  file.path(dir_data_common, "census", "ofm_april1_postcensal_estimates_pop_1960-present.xlsx"),
+  sheet = 2, skip = 2, na = "."
+) |> 
+  drop_na(Filter) |>
+  janitor::clean_names() |> #glimpse() 
+  select(filter, county, jurisdiction, contains("population")) |> 
+  pivot_longer(contains("population"), values_to = "est_pop") |> 
+  mutate(
+    year = str_remove(name, "_") |> str_sub(2, 5), 
+    name = NULL,
+    across(c(year, est_pop), as.numeric)
+  ))
+
+```
+
+```{r ofm_housing}
 ofm_housing <- readxl::read_excel(
   file.path(dir_data_common, "census", "ofm_april1_postcensal_estimates_housing_1980_1990-present.xlsx"),
   sheet = 2, skip = 2, na = "."
-  ) |> 
+) |> 
   drop_na(Filter) |>  #filter(Filter!=".") |> 
-  janitor::clean_names() |> 
-  select(filter, county, jurisdiction, contains("total_housing")) |> 
-  pivot_longer(contains("total_housing"), values_to = "total_housing") |> 
+  janitor::clean_names() |> #glimpse() 
+  # select(filter, county, jurisdiction, contains("total_housing")) |> 
+  # pivot_longer(contains("total_housing"), values_to = "total_housing") |> 
+  # mutate(
+  #   year = str_sub(name, 2, 5), name = NULL,
+  #   across(c(year, total_housing), as.numeric)
+  #   )
+  select(-line) |> 
+  pivot_longer(contains("units"), values_to = "units") |> 
   mutate(
-    year = str_sub(name, 2, 5), name = NULL,
-    across(c(year, total_housing), as.numeric)
+    year = str_sub(name, 2, 5), 
+    across(c(year, units), as.numeric),
+    name = case_when(
+      str_detect(name, "total") ~ "total",
+      str_detect(name, "one_unit") ~ "single",
+      str_detect(name, "two_or_more") ~ "multi",
+      str_detect(name, "special") ~ "other"
     )
-
-ofm_housing_cnty <- ofm_housing |> 
-  filter(filter == "1", year > 1980) |> 
-  select(cnty = county, year, total_housing)
-
-# ofm_housing_cnty |> #count(jurisdiction) |> print(n=50)
-#   plotly::plot_ly(name = ~cnty) |> plotly::add_lines(x = ~year, y = ~total_housing)
-# 
-# ofm_housing_cnty |> filter(year == 1990) |> 
-#   #arrange(desc(total_housing)) |> print()
-#   filter(total_housing > 50000) |> 
-#   ggplot(aes(total_housing, fct_reorder(cnty, total_housing, identity))) +
-#   geom_col() #+ scale_x_log10(labels = scales::label_log())
+  )
 
 ```
 
 
 # Results
+
+```{r wa_imp_statewide_summary}
+# #if Lazarus ~580-720ac/y for 2001:2019
+# expand_grid(ac = c(11:13)*1000, y = 18:19) |> mutate(ac_y = ac/y)
+
+wa_imp <- rde_cnty |> 
+  distinct(pid, .keep_all = T) |> 
+  summarise(
+    across(
+      c(reach_ac, 
+        rmz_ac, eow_ac, flood_ac, 
+        nonfstry_impv_inc_ac
+        ),
+      ~sum(., na.rm = T)
+    )
+  ) |> 
+  mutate(
+    imp_pct_reach_ac = nonfstry_impv_inc_ac / reach_ac,
+    #per KP, HRCD 2011:2017 NAIP is summer to summer
+    ha_y = 0.4*(nonfstry_impv_inc_ac / 6),
+    ac_y = nonfstry_impv_inc_ac / 6 
+  ) 
+```
 
 ```{r rde_cnty_sum_impv}
 rde_cnty_sum_impv <- rde_cnty |> 
@@ -448,50 +347,56 @@ rde_cnty_sum_impv <- rde_cnty |>
     )
   ) |> 
   left_join(
-    ofm_housing_cnty |> 
-      filter(year %in% c(2011, 2017)) |> 
-      pivot_wider(names_from = year, values_from = total_housing) |> 
-      mutate(d_hous = `2017` - `2011`)
+    ofm_pop |> 
+      filter(filter == "1", year %in% c(2011, 2017)) |> 
+      select(cnty = county, year, est_pop) |> 
+      #arrange(cnty, year) |> summarise(across(est_pop, list(d = ~.[2] - .[1])), .by = cnty)
+      pivot_wider(names_from = year, names_glue =  "{year}_{.value}", values_from = est_pop) |> 
+      mutate(d_est_pop = `2017_est_pop`- `2011_est_pop`)
+    ,
+    by = "cnty"
+  ) |> 
+  left_join(
+    ofm_housing |> 
+      filter(filter == "1", year %in% c(2011, 2017)) |> 
+      select(cnty = county, year, name, units) |> 
+      #pivot_wider(names_from = name, values_from = units) |> 
+      #arrange(cnty, year) |> summarise(across(total:other, list(d = ~.[2] - .[1])), .by = cnty)
+      pivot_wider(names_from = year, values_from = units) |> 
+      mutate(d = `2017`- `2011`) |> 
+      pivot_wider(names_from = name, values_from = where(is.numeric))
     ,
     by = "cnty"
   )
+
+
+sf_cnty_rde <- sf_cnty |> 
+  left_join(rde_cnty_sum_impv, by = "cnty")
 ```
 
+The results presented here are based on the full "riparian corridor" constituted by the sum of the RMZ, EOW, and floodplain polygons associated with each RDE reach unit. Stratification by county refers to the area within geographic boundaries rather than the jurisdictional extent of county governance. Values within these geographic boundaries reflect various combinations of federal, tribal, state, and incorporated municipal regulatory regimes, and are not due to the actions of a single managing authority.
+
 ```{r sf_for_new_multipanel}
-sf_cnty |> 
-    left_join(rde_cnty_sum_impv, by = "cnty")
+list(
+  #range(rde_cnty_sum_impv$reach_ac)
+  reach_ac = sf_cnty_rde |>  
+    ggplot() + geom_sf(aes(fill = reach_ac), show.legend = T) + 
+    #wacolors::scale_fill_wa_c("sea", reverse = T, na.value = "pink") +
+    #wacolors::scale_fill_wa_c("sea", reverse = T, limits = c(25000, 500000), oob = scales::squish, na.value = "pink") +
+    wacolors::scale_fill_wa_b("sea", reverse = T, na.value = "pink") +
+    labs(subtitle = "Total assessed riparian corridor\nRMZ+EOW+floodplain")
+  ,
+  est_pop = sf_cnty_rde |>  
+    ggplot() + geom_sf(aes(fill = `2011_est_pop`), show.legend = T) + 
+    scale_fill_gradient(low = alpha("orange", 0.2), high = "orange", na.value = "pink") +
+    labs(subtitle = "2011 estimated population")
+  ,
+)
 
 - reach_ac, swifd-ac, pop/housing (normalized to cnty_ac or reach_ac), imperv, tree loss
 
 ```
 
-
-```{r wa_imp}
-# #if Lazarus ~580-720ac/y for 2001:2019
-# expand_grid(ac = c(11:13)*1000, y = 18:19) |> mutate(ac_y = ac/y)
-
-wa_imp <- rde_cnty |> 
-  distinct(pid, .keep_all = T) |> 
-  summarise(
-    across(
-      c(reach_ac, 
-        #riparian_ac, 
-        rmz_ac, eow_ac, flood_ac, 
-        nonfstry_impv_inc_ac #, nonfstry_tree_dec_ac
-        ),
-      ~sum(., na.rm = T)
-    ) #, .by = cnty
-  ) |> 
-  mutate(
-    imp_pct_reach_ac = nonfstry_impv_inc_ac / reach_ac,
-    #per KP, HRCD 2011:2017 NAIP is summer to summer
-    ha_y = 0.4*(nonfstry_impv_inc_ac / 6),
-    ac_y = nonfstry_impv_inc_ac / 6 
-    #football fields: ,across(starts_with("ac_y"), list(ff = ~./1.32))
-  ) 
-```
-
-The results presented here are based on the full "riparian corridor" constituted by the sum of the RMZ, EOW, and floodplain polygons associated with each RDE reach unit. Stratification by county refers to the area within geographic boundaries rather than the jurisdictional extent of county governance. Values within these geographic boundaries reflect various combinations of federal, tribal, state, and incorporated municipal regulatory regimes, and are not due to the actions of a single managing authority.
 
 At the full statewide scale, `r round(0.4*wa_imp$nonfstry_impv_inc_ac)` hectares of new impervious cover were added during 2011-2017 (table NNNN; `r round(wa_imp$nonfstry_impv_inc_ac)`). This corresponded to `r wa_imp$imp_pct_reach_ac` of the `r round(0.4*wa_imp$reach_ac)` total reach hectares, and annual increase of `r wa_imp$ha_y` ha (`r wa_imp$ac_y` acres).
 
