@@ -355,7 +355,8 @@ rde_cnty_sum <- rde_cnty |>
     across(
       starts_with("nonf"),
       list(
-        per_100ac = ~100*(./reach_ac)
+        #per_100ac = ~100*(./reach_ac)
+        pct_rch = ~(./reach_ac)
       )
     )
   ) |> 
@@ -409,9 +410,11 @@ sf_cnty_rde <- sf_cnty |>
 
 Results are presented for the full "riparian corridor" composed of the RMZ, EOW, and floodplain polygons associated with each reach unit. As noted previously, values presented relative to the stratification by county geographic boundaries reflect various combinations of federal, tribal, state, and municipal regulatory regimes, and are not due to the actions of a single management authority.
 
-Statewide, the assessed reaches totaled `r round(wa_imp$reach_ha[4])` hectares, with `r round(wa_imp$rmz_ac[4]/wa_imp$reach_ac[4],3)`% consisting of RMZ (supp. fig 1). Variation in the NHD, soils and floodplain data underlying the polygon tessellation contributed to differences in the overall and proportional extent of the assessed riparian corridor throughout the state, both between and within county boundaries, but total reach area was an average of approximately 22% (median 17.3%, IQR 11.9% - 28.4%) of full county area (Fig map A, supp. fig 2). The largest areas of reaches associated with the distribution of Chinook salmon were in central and northern Puget Sound, with population and housing values also highest in the vicinity of Seattle, the state's largest urban area (Fig map B-D).
+Statewide, the assessed reaches totaled `r round(wa_imp$reach_ha[4])` hectares, with `r round(wa_imp$rmz_ac[4]/wa_imp$reach_ac[4],3)`% consisting of RMZ (supp. fig 1). Variation in the NHD, soils and floodplain data underlying the polygon tessellation contributed to differences in the overall and proportional extent of the assessed riparian corridor throughout the state, both between and within county boundaries, but total reach area was an average of approximately 22% (median 17.3%, IQR 11.9% - 28.4%) of full county area (@fig-multi_map A, supp. fig 2). The largest areas of reaches associated with the distribution of Chinook salmon were in central and northern Puget Sound, with population and housing values also highest in the vicinity of Seattle, the state's largest urban area (@fig-multi_map B-D).
 
-```{r gg_sf_multi}
+```{r gg_multi_map}
+#| label: fig-multi_map
+
 #as_tibble(sf_cnty_rde) |> mutate(pct = reach_ac/cnty_ac) |> pull(pct) |> summary()
 
 list(
@@ -421,7 +424,7 @@ list(
     #wacolors::scale_fill_wa_c("sea", reverse = T, na.value = "pink") +
     #wacolors::scale_fill_wa_c("sea", reverse = T, limits = c(25000, 500000), oob = scales::squish, na.value = "pink") +
     #wacolors::scale_fill_wa_b("sea", reverse = T, na.value = "pink") +
-    scale_fill_gradient(name = "hectares", labels = scales::comma, low = "#BEE7DF", high = "#212540", na.value = "pink") +
+    scale_fill_gradient(name = "hectares", labels = scales::label_comma(), low = "#BEE7DF", high = "#212540", na.value = "pink") +
     labs(subtitle = "Total assessed riparian corridor\nRMZ+EOW+floodplain")
   ,
   # reach_ac_cnty_ac = sf_cnty_rde |> 
@@ -468,11 +471,13 @@ list(
 
 ```
 
-During the 2011-2017 period in these HRCD data, `r round(wa_imp$impv_inc_ha[4])` hectares of new impervious cover were estimated to have been added to the riparian corridor (table 1; `r round(wa_imp$impv_inc_ac[4])` acres), corresponding to an annual increase of `r round(wa_imp$ha_y[4])` ha/year (`r round(wa_imp$ac_y[4])` acres/year). 
+During the 2011-2017 period in these HRCD data, an estimated `r round(wa_imp$impv_inc_ha[4])` hectares of new impervious cover were added to the riparian corridor (table 1; `r round(wa_imp$impv_inc_ac[4])` acres), corresponding to an annual increase of `r round(wa_imp$ha_y[4])` ha/year (`r round(wa_imp$ac_y[4])` acres/year). 
 
-Although total additional impervious area was similar between non-salmon and Chinook-associated reaches, the increase was disproportionately greater in reaches associated with Chinook distribution, with new impervious making up an order of magnitude higher percentage of the total assessed area (0.1% vs 0.01%, table 1, fig NNN).
+The additional area of impervious cover in non-salmon reaches was similar to that of reaches associated with Chinook distribution, but this new impervious area was an order of magnitude higher percentage of the assessed riparian corridor in Chinook-associated reaches (0.1% vs 0.01%, @tab-statewide, @fig-statewide_swifd).
 
-```{r gt_statewide_ac_year}
+```{r gt_statewide}
+#| label: tab-statewide
+
 wa_imp |> 
   gt(caption = "2011-17 HRCD Impervious Increase within RDE Extent") |> 
 #  cols_hide(ends_with("_ac")) |> 
@@ -486,6 +491,8 @@ wa_imp |>
 ```
 
 ```{r gg_statewide_swifd}
+#| label: fig-statewide_swifd
+
 rde_cnty_swifd <- rde_cnty |> 
   distinct(pid, .keep_all = T) |> 
   summarise(
@@ -500,7 +507,8 @@ rde_cnty_swifd <- rde_cnty |>
     across(
       starts_with("nonf"),
       list(
-        per_100ac = ~100*(./reach_ac)
+        #per_100ac = ~100*(./reach_ac)
+        pct_rch = ~(./reach_ac)
       )
     )
   )
@@ -519,19 +527,20 @@ pal_swifd_chin <- c("not_salmon" = "tan", "salmon_not_chin" = alpha("salmon", 0.
 #     labs(x = "SWIFD status") 
 # }/{
   rde_cnty_swifd |> 
-    ggplot(aes(swifd_chin, nonfstry_impv_inc_ac_per_100ac)) +
+    ggplot(aes(swifd_chin, nonfstry_impv_inc_ac_pct_rch)) +
     geom_col(aes(fill = swifd_chin), show.legend = F) + 
     geom_text(
-      aes(label = paste('total ac.:', round(nonfstry_impv_inc_ac))),
-      nudge_y = -0.005
+      aes(label = paste('total ha.:', round(ha*nonfstry_impv_inc_ac)))
+      ,nudge_y = -0.0001
     ) +
     scale_fill_manual(values = pal_swifd_chin) +
-    labs(x = "SWIFD status", y = "Acres impervious increase per 100 reach ac.") 
+    scale_y_continuous(labels = scales::label_percent()) +
+    labs(x = "SWIFD status", y = "Impervious increase proportion of riparian corridor") 
 #}
 
 ```
 
-Most individual change areas intersecting the riparian corridor were small, with nearly 95% less than 0.4ha (1ac) and a median increase of `r round(ha*median(filter(distinct(rde_cnty, pid, .keep_all=T), nonfstry_impv_inc_ac > 0)$nonfstry_impv_inc_ac),4)` ha, considerably less than the 900m^2 area of a single 30m pixel. This pattern was broadly consistent across portions of the state with more and less total increase (fig NNN map/column panels). 
+Most individual change areas intersecting the riparian corridor were small, with nearly 95% less than 0.4ha (1ac) and a median increase of `r round(ha*median(filter(distinct(rde_cnty, pid, .keep_all=T), nonfstry_impv_inc_ac > 0)$nonfstry_impv_inc_ac),4)` ha, considerably less than the 900m^2 area of a single 30m pixel. This pattern was broadly consistent across portions of the state with more and less total increase (@fig-impv_inc_per_rch_boxes). 
 
 ```{r statewide_size_distrib, echo=FALSE, eval=FALSE}
 rde_cnty |> 
@@ -552,7 +561,9 @@ rde_cnty |>
 
 ```
 
-```{r gg_rde_cnty_per_reach_imp_inc}
+```{r gg_impv_inc_per_rch_boxes}
+#| label: fig-impv_inc_per_rch_boxes
+
 # rde_cnty |> 
 #   filter(nonfstry_impv_inc_ac > 0) |> 
 #   ggplot(aes(
@@ -585,86 +596,62 @@ rde_cnty |>
   geom_jitter(height = 0.2, alpha = 0.2, size = 0.2) +
   geom_boxplot(varwidth = T, outliers = F, color = "blue", linewidth = 0.3, fill = NA) + 
   labs(y = NULL, x = "hectares",
-       subtitle = "Per-reach impervious cover increases up to 1 acre")
+       subtitle = "Per-reach impervious cover increases up to 0.4 ha (1 acre)")
 } + 
-  plot_layout(heights = c(1/4,3/4))
+  plot_layout(heights = c(1/4,3/4), tag_level = "A")
 ```
 
+When aggregated by county boundaries, the largest impervious increases were concentrated in more heavily urbanized portions of the state, congruent with expectations based on the geographic distributions of population and housing. Summed change areas were greatest in proximity to the large and rapidly growing metropolitan areas of Seattle, Tacoma, and Vancouver in western Washington (King, Pierce, Clark) and Spokane and the Tri-Cities in the east (@fig-impv_inc_ha_map).
 
-Total impervious increase varied considerably among county boundary extents, with the largest additions concentrated in more heavily urbanized portions of the state, particularly central and south Puget Sound. Congruent with expectations, changes were greatest in proximity to the large and rapidly growing metropolitan areas of Seattle, Tacoma and Vancouver in western Washington and Spokane and Tri-Cities in the east.
+```{r gg_impv_inc_ha_map}
+#| label: fig-impv_inc_ha_map
+ 
+#can add Oly and Yakima, Pasco/Richland etc. with str_detect(name)
+sf_wa_city <- maps::us.cities |> 
+      filter(country.etc == "WA", pop > 150000) |> 
+      mutate(name = str_remove(name, " WA")) |> 
+      sf::st_as_sf(coords = c("long", "lat"), crs = 4326) |> 
+      sf::st_transform(epsg)
 
-```{r gg_impv_inc_ac_per_100ac_col}
-
-# {
-#   {
-#   sf_cnty_rde |> 
-#     ggplot() + geom_sf(aes(fill = impv_inc_ac), color = "white", show.legend = F) + 
-#     scale_fill_gradient(name = "", low = "grey90", high = "grey10") +
-#     labs(title = "Riparian impervious cover increase 2011-2017", subtitle = "Sum of HRCD estimates, RMZ+EOW+floodplain")
-# }+{
-  sf_cnty_rde |> 
-    ggplot() + geom_sf(aes(fill = impv_inc_ac_per_100ac), color = "white", show.legend = T) + 
-    scale_fill_gradient(low = "grey90", high = "grey10") +
-    labs(
-      title = "Riparian impervious cover increase 2011-2017", 
-      subtitle = "Sum of HRCD estimates, normalized per 100ac RMZ+EOW+floodplain"
-      ) +
-  theme(legend.position = "bottom", 
+sf_cnty_rde |>
+  ggplot() + geom_sf(aes(fill = ha*impv_inc_ac), color = "white", show.legend = T) +
+  geom_sf(data = sf_wa_city, color = "brown", show.legend = F) +
+  geom_sf_text(data = sf_wa_city, aes(label = name), color = "brown", hjust = 1.1, show.legend = F) +
+  scale_fill_gradient(name = "ha", low = "grey90", high = "grey10") +
+  labs(
+    x = NULL, y = NULL,
+    title = "Riparian impervious cover increase 2011-2017", 
+    subtitle = "Sum of HRCD estimates, RMZ+EOW+floodplain") +
+  theme(legend.position = "bottom",
         legend.key.height = unit(0.05, "npc"),
-        legend.key.width = unit(0.1, "npc"),
-        legend.title = element_text(size = 8))
-# }
-  # }/{
-#   {
-#   rde_cnty_sum |> 
-#     ggplot() + 
-#     geom_col(aes(
-#       ha*impv_inc_ac, fct_reorder(cnty, impv_inc_ac),
-#       fill = impv_inc_ac), show.legend = F) + 
-#     scale_fill_gradient(name = "hectares", low = "grey90", high = "grey10") +
-#     labs(y = NULL, x = "hectares")
-# }+{
-#   rde_cnty_sum |> 
-#     ggplot() +
-#     geom_col(aes(
-#       impv_inc_ac_per_100ac, fct_reorder(cnty, impv_inc_ac_per_100ac),
-#       fill = impv_inc_ac_per_100ac),
-#       show.legend = F) + 
-#     scale_fill_gradient(name = "", low = "grey90", high = "grey10") +
-#     labs(y = NULL, x = "Acres imp. inc. per 100 reach ac.") 
-# # }
-# } +
-#   plot_layout(guides = "collect") +
-#   plot_annotation(
-#     title = "Riparian impervious cover increase 2011-2017", 
-#     subtitle = "Sum of HRCD estimates, RMZ+EOW+floodplain"
-#   )
+        legend.key.width = unit(0.15, "npc")
+        )
 
 ```
 
-
-*RESTART HERE*
-
-Examining reach-area normalized change versus total aggregate increase highlighted differences in the relative density of new impervious cover (figure NNN scatter panels). Higher per-unit area rates in several instances followed from similar impervious additions that occurred within smaller overall riparian corridor extents.
-
-```{r gg_nonfstry_impv_inc_ac_per_100ac_vs_abs}
+```{r gg_nonfstry_impv_inc_ac_per_100ac_vs_abs, echo=F, eval=F}
 {
 rde_cnty_sum |> 
-  ggplot(aes(nonfstry_impv_inc_ac, nonfstry_impv_inc_ac_per_100ac)) +
+  ggplot(aes(impv_inc_ac, impv_inc_ac_per_100ac)) +
   geom_point(size = 0.3, show.legend = F) + 
-  geom_text(aes(label = cnty), size = 3, check_overlap = F, show.legend = F) + 
-  geom_smooth(method = "lm") +
-  wacolors::scale_fill_wa_c("volcano", reverse = T, na.value = "pink", aesthetics = c("fill","color")) +
+  geom_text(aes(label = cnty), size = 3, check_overlap = F,
+            #nudge_x = 3, 
+            hjust = 0, vjust = 1.2,
+            #position = position_dodge(width = 0.01),
+            show.legend = F) + 
+  #geom_smooth(method = "lm") +
+      coord_cartesian(xlim = c(100, 650), ylim = c(0.02, 0.18), expand = F) +
   labs(
     x = "Total acres", y = "Acres imp. inc. per 100ac",
     title = "Impervious increases by county,\narea normalized vs absolute area") 
 }/{
 rde_cnty_sum |> 
-  ggplot(aes(nonfstry_impv_inc_ac, nonfstry_impv_inc_ac_per_100ac)) +
+  ggplot(aes(impv_inc_ac, impv_inc_ac_per_100ac)) +
   geom_point(size = 0.3, show.legend = F) + 
-  geom_text(aes(label = cnty), size = 3, check_overlap = F, show.legend = F) + 
-  geom_smooth(method = "lm") +
-  wacolors::scale_fill_wa_c("volcano", reverse = T, na.value = "pink", aesthetics = c("fill","color")) +
+  geom_text(aes(label = cnty), size = 3, check_overlap = T,
+            nudge_x = 0.5, hjust = 0,
+            show.legend = F) + 
+  #geom_smooth(method = "lm") +
   coord_cartesian(xlim = c(0,75), ylim = c(0, 0.08)) +
   labs(
     x = "Total acres", y = "Acres imp. inc. per 100ac",
@@ -672,76 +659,96 @@ rde_cnty_sum |>
 }
 ```
 
-Similarly, when examined relative to total housing unit change during the same 2011-2017 time period, considerable differences in the reach-area normalized impervious increase were evident between county boundaries. This comparison indicates only general patterns in the configuration of land cover conversion because changes included various anthropogenic causes such as roads, warehouses, etc., and were not restricted to residential construction. Nonetheless, the variation in this relationship highlights the potential for housing gains to come at quite divergent costs in riparian condition.
+Normalizing impervious increase by the total riparian corridor (i.e., summed reach area within county boundary) highlighted differences in the relative density of change (@fig-impv_inc_ac_pct_reach). King county's boundaries contained the largest aggregate increase, but those within Pierce and Clark county extents both formed a larger proportion of the assessed area. Conversely, though total increases were smaller within the Kitsap, Island, and Benton boundaries, these changes made up higher proportions of the riparian corridor.
 
-```{r gg_nonfstry_impv_inc_ac_per_100ac_vs_housing}
-# {
-# rde_cnty_sum |> 
-#   ggplot(aes(d_hous, nonfstry_impv_inc_ac)) +
-#   geom_point(size = 0.3, show.legend = F) + 
-#   geom_text(aes(label = cnty), size =3, color = "purple", nudge_y = 0.005) +
-#   geom_smooth(method = "lm") +
-#   wacolors::scale_fill_wa_c("volcano", reverse = T, na.value = "pink", aesthetics = c("fill","color")) +
-#   #scale_x_log10(labels = scales::label_log()) + 
-#   labs(
-#     x = "OFM 2017-2011 total housing unit change", 
-#     y = "total est. impervious increase",
-#     title = "Estimated riparian impervious increases vs total housing unit increase by county") 
-# }/
+```{r gg_impv_inc_ac_pct_reach}
+#| label: fig-impv_inc_ac_pct_reach
+
 {
 rde_cnty_sum |> 
-    arrange(desc(d_hous)) |> 
-  ggplot(aes(d_hous, nonfstry_impv_inc_ac_per_100ac)) +
+  ggplot(aes(ha*reach_ac, ha*impv_inc_ac)) +
   geom_point(size = 0.3, show.legend = F) + 
-  geom_text(aes(label = cnty), size =3, color = "purple", nudge_y = 0.005) +
-  geom_smooth(method = "lm") +
-  wacolors::scale_fill_wa_c("volcano", reverse = T, na.value = "pink", aesthetics = c("fill","color")) +
-  scale_x_continuous(breaks = seq(0, 70000, by = 10000), labels = scales::comma) +
-  #scale_x_log10(labels = scales::label_log()) + 
+  geom_text(aes(label = cnty), size = 3, check_overlap = T,
+            hjust = -0.1, vjust = 0,
+            show.legend = F) + 
+    scale_x_continuous(labels = scales::label_comma()) +
   labs(
-    x = "OFM 2017-2011 total housing unit change", 
-    y = "est. impervious increase per 100ac",
-    title = "Area normalized riparian impervious increases vs total housing unit increase by county") 
+    x = "Summed riparian corridor (ha)", 
+    y = "Summed impervious increase (ha)",
+    title = "Impervious increases aggregated to county boundaries") 
 }/{
-rde_cnty_sum |> 
-  ggplot(aes(d_hous, nonfstry_impv_inc_ac_per_100ac)) +
-  geom_point(size = 0.3, show.legend = F) + 
-  geom_text(aes(label = cnty), size =3, color = "purple", nudge_y = 0.001) +
-  geom_smooth(method = "lm") +
-  wacolors::scale_fill_wa_c("volcano", reverse = T, na.value = "pink", aesthetics = c("fill","color")) +
-  coord_cartesian(xlim = c(500, 5000), ylim = c(0, 0.08)) +
+  rde_cnty_sum |> 
+  #ggplot(aes( (ha*impv_inc_ac)/(ha*reach_ac), cnty)) +
+  ggplot(aes( impv_inc_ac_pct_rch, fct_reorder(cnty, impv_inc_ac_pct_rch))) +
+  geom_point(aes(size = ha*impv_inc_ac), show.legend = F) + 
+    scale_size_area(max_size = 4) +
+    scale_x_continuous(labels = scales::label_percent()) +
   labs(
-    x = "OFM 2017-2011 total housing unit change", 
-    y = "est. impervious increase per 100ac",
-    subtitle = "County areas with 500 to 5000 housing unit increases") 
-}
+    x = "Percentage of assessed riparian corridor",
+    y = NULL) 
+} +
+  plot_annotation(tag_levels = "A")
 
 ```
 
-```{r proportional_scatters, echo=F, eval=FALSE}
-# #housing unit density relative to proportion riparian? 
-# #need to think about this - maybe better as 11_17 arrows showing change in density, maybe also against 11_17 impv_inc
-# as_tibble(sf_cnty_rde) |> 
-#   mutate(cnty_ac = st_area(geometry) |> units::set_units("acres") |> as.numeric()) |> 
-#   select(cnty, cnty_ac, reach_ac, `2011_total`, `2011_single`, `2011_multi`, `2011_other`) |>
-#   pivot_longer(-c(cnty, cnty_ac, reach_ac)) |>
-#   mutate(
-#     reach_cnty_ac = reach_ac/cnty_ac,
-#     hu_cnty_ac = value/cnty_ac, #density relative to overall boundaries
-#     hu_reach_ac = value/reach_ac, #density relative to riparian corr
-#     cnty = factor(cnty) |> fct_reorder(hu_cnty_ac)
-#     ) |>
-#   filter(name == "2011_total") |> 
-#   ggplot() +
-#   geom_point(aes(reach_cnty_ac, hu_cnty_ac), size = 0.4) +
-#   geom_text(aes(reach_cnty_ac, hu_cnty_ac, label = cnty), size = 3) +
-#   facet_wrap(~name, scales = "free")
-# 
+Population increases during 2011-2017 were positively correlated with the normalized impervious increase in the riparian corridor, but considerable variation was evident among county-boundary aggregates. For example, the King and Clark areas had population gains greater than that within the Pierce boundary, but smaller proportional impervious increases. Conversely, the Kitsap extent had the fourth largest normalized impervious increase despite less population growth than many other areas (@fig-impv_inc_pop_change). A comparable pattern was evident for changes in housing units, with substantial variation around a generally positive correlation (@fig-impv_inc_housing_change). The King and Island county extents were notable for the, respectively, large and small housing gains relative to proportional riparian corridor impervious additions. 
+
+```{r gg_impv_inc_pop_change}
+#| label: fig-impv_inc_pop_change
+
+# rde_cnty_sum |>
+#   ggplot(aes(impv_inc_ac_pct_rch, log10(d_est_pop))) +
+#   geom_point(aes(size = `2011_est_pop`, color = `2011_est_pop`)) +
+#   geom_text(aes(label = cnty), hjust = 1.1, size = 3, check_overlap = T) +
+#   scale_size_area(max_size = 4, guide = "none") +
+#   scale_color_gradient(name = "2011 est. pop. x1000", low = alpha("orange", 0.6), high = "brown", labels = scales::label_number(scale = 1/1000)) +
+#   scale_y_continuous(name = "log10 population change 2011-2017", labels = scales::label_log(digits = 1)) +
+#   scale_x_continuous(name = "Percentage of assessed riparian corridor", labels = scales::label_percent()) +
+#   theme(
+#     legend.position = "bottom", legend.key.width = unit(0.1, "npc")
+#   )
+
+rde_cnty_sum |> 
+  #ggplot(aes(d_est_pop/`2011_est_pop`, impv_inc_ac_pct_rch)) +
+  # scale_x_continuous(name = "population change 2011-2017", labels = scales::label_percent()) +
+  # scale_y_continuous(name = "Percentage of assessed riparian corridor", labels = scales::label_percent())
+  ggplot(aes(impv_inc_ac_pct_rch, d_est_pop/`2011_est_pop`)) +
+  geom_point(aes(size = `2011_est_pop`, color = `2011_est_pop`)) +
+  geom_text(aes(label = cnty), hjust = -0.1, size = 3, check_overlap = T) +
+  scale_size_area(max_size = 4, guide = "none") +
+  scale_color_gradient(
+    name = "2011 est. pop. x1000",
+    low = alpha("orange", 0.6), high = "brown", labels = scales::label_number(scale = 1/1000)) +
+  scale_y_continuous(name = "Population change 2011-2017", labels = scales::label_percent()) +
+  scale_x_continuous(name = "Percentage of assessed riparian corridor", labels = scales::label_percent()) +
+  coord_cartesian(xlim = c(-0.0001, 0.002), ylim = c(-0.01, .13), expand = F) +
+  theme(
+    legend.position = "bottom", legend.key.width = unit(0.1, "npc")
+  )
+  
+```
+
+```{r gg_impv_inc_housing_change}
+#| label: fig-impv_inc_housing_change
+
+rde_cnty_sum |>
+  # select(cnty, impv_inc_ac_pct_rch, d_total, d_single, d_multi) |> 
+  # pivot_longer(starts_with("d_")) |> 
+  # ggplot(aes(impv_inc_ac_pct_rch, value, color = name)) +
+  # facet_wrap(~name, ncol = 1, scales = "free")
+  ggplot(aes(impv_inc_ac_pct_rch, d_total)) +
+  geom_point(color = "purple", size = 0.8) + # aes(size = `2011_total`)
+  geom_text(aes(label = cnty), hjust = 1.1, size = 3, check_overlap = T) +
+  scale_x_continuous(name = "Percentage of assessed riparian corridor", labels = scales::label_percent()) +
+  scale_y_continuous(name = "Change in total housing units", labels = scales::label_comma()) 
 
 ```
 
 
 
+
+
+*Streamcat/NLCD?!?*
 
 
 # Discussion
@@ -756,7 +763,8 @@ In addition to the hydrographic error and that in the site index values on which
 
 Moreover, the addition of upland imperviousness outside of this or any other assessed corridor from 10m to 100m is highly likely to affect riparian and in-channel conditions (i.e., a 30m "buffer" is unlikely to have the same function as part of a continuous forest versus as a distinct strip adjacent to converted land). Beyond site-specific slope and soils factors, the concurrent surrounding watershed context has inevitably shaped our understanding of the functional dimensions that underlie buffer formulations. But the applicability of distance-decay curves likely warrants review as increasing imperviousness continues to alter flow paths (e.g., away from saturation excess and towards infiltration excess dynamics). While an SPTH standard allows for some flexibility to avoid prescribing a single critical area dimension, the basic concept may be invalidated where upland surface alteration has rendered even some multiple of SPTH (2x or 5x etc.) insufficient to perform all desired functions.
 
-
+- This comparison indicates only general patterns in the configuration of land cover conversion because changes included various anthropogenic causes such as roads, warehouses, etc., and were not restricted to residential construction. Nonetheless, the variation in this relationship highlights the potential for housing gains to come at quite divergent costs in riparian condition.
+- reiterate that counties are NOT replicates
 - east vs west considerations?
 
 
@@ -872,7 +880,7 @@ rde_cnty_sum |>
   pivot_longer(-cnty) |>
   #filter(name == "eow_ac") |> #Grant Co really does have numerous large lakes and reservoirs
   ggplot() + geom_col(aes(value, cnty, fill = name)) +
-  scale_x_continuous(labels = scales::comma) +
+  scale_x_continuous(labels = scales::label_comma()) +
   scale_fill_manual(name = "RDE zone", values = c("lightblue","darkgreen","green")) +
   labs(x = NULL, y = NULL)
 
@@ -891,12 +899,11 @@ as_tibble(sf_cnty_rde) |>
   ggplot() + 
   geom_col(aes(pct, fct_reorder(cnty, pct, identity), fill = pct)) +
     scale_fill_gradient(name = "reach / cnty", low = grey(0.8), high = grey(0.2)) +
-  scale_x_continuous("Proportion of county area", labels = scales::percent) +
+  scale_x_continuous("Proportion of county area", labels = scales::label_percent()) +
   labs(y = NULL)
 } +
   plot_annotation("Assessed reach area as proportion of county boundary extent")
 ```
-
 
 ```{r gg_rde_cnty_housing_stacked_cols}
 rde_cnty_sum |>
@@ -904,9 +911,44 @@ rde_cnty_sum |>
   select(cnty, `2011_single`, `2011_multi`, `2011_other`) |>
   pivot_longer(-cnty) |>
   ggplot() + geom_col(aes(value, cnty, fill = name)) +
-  scale_x_continuous(labels = scales::comma) +
+  scale_x_continuous(labels = scales::label_comma()) +
   scale_fill_manual(name = "Housing", values = c("brown","yellow","tan")) +
-  labs(x = NULL, y = NULL)
+  labs(x = NULL, y = NULL, title = "2011 housing composition")
+```
+
+```{r gg_impv_vs_pop}
+#really potentially misleading?
+rde_cnty_sum |> 
+  mutate(
+    pct_impv = impv_inc_ac / sum(impv_inc_ac),
+    pct_pop = d_est_pop / sum(d_est_pop)
+  ) |> 
+  ggplot(aes(pct_pop, pct_impv)) +
+  geom_abline() +
+  geom_point() +
+  geom_text(aes(label = cnty)) +
+  labs(title = "Statewide proportion impv vs pop")
+```
+
+```{r gg_impv_vs_tree_dec}
+
+rde_cnty_sum |> #glimpse()
+  #ggplot(aes(tree_dec_ac_pct_rch, impv_inc_ac_pct_rch)) +
+  ggplot(aes(impv_inc_ac_pct_rch, tree_dec_ac_pct_rch)) +
+  geom_point() +
+  geom_text(aes(label = cnty))
+
+# rde_cnty |> 
+#   drop_na(nonfstry_impv_inc_ac) |> 
+#   distinct(pid, .keep_all = T) |>
+#   filter(nonfstry_tree_dec_ac + nonfstry_impv_inc_ac > 0) |> 
+#   filter(nonfstry_tree_dec_ac + nonfstry_impv_inc_ac < 2) |> 
+#   ggplot(aes(nonfstry_tree_dec_ac, nonfstry_impv_inc_ac)) +
+#   geom_abline(linetype = 3) +
+#   #geom_point(size = 0.1, alpha = 0.3)
+#   #geom_hex()
+#   geom_bin2d()
+
 ```
 
 ```{r gg_rde_cnty_per_reach_imp_inc_pct_reach_ac}
@@ -919,13 +961,34 @@ rde_cnty |>
     )) +
   geom_jitter(height = 0.2, alpha = 0.5, size = 0.4) +
   geom_boxplot(varwidth = T, outliers = F, color = "orange", fill = NA) + 
-  scale_x_continuous(labels = scales::percent) +
+  scale_x_continuous(labels = scales::label_percent()) +
   labs(y = NULL, x = NULL,
        title = "Per-reach impervious cover increases as percentage of reach area",
        subtitle = "Reach acres = RMZ plus EOW and floodplain where present"
        )
 ```
 
+```{r proportional_scatters, echo=F, eval=FALSE}
+# #housing unit density relative to proportion riparian? 
+# #need to think about this - maybe better as 11_17 arrows showing change in density, maybe also against 11_17 impv_inc
+# as_tibble(sf_cnty_rde) |> 
+#   mutate(cnty_ac = st_area(geometry) |> units::set_units("acres") |> as.numeric()) |> 
+#   select(cnty, cnty_ac, reach_ac, `2011_total`, `2011_single`, `2011_multi`, `2011_other`) |>
+#   pivot_longer(-c(cnty, cnty_ac, reach_ac)) |>
+#   mutate(
+#     reach_cnty_ac = reach_ac/cnty_ac,
+#     hu_cnty_ac = value/cnty_ac, #density relative to overall boundaries
+#     hu_reach_ac = value/reach_ac, #density relative to riparian corr
+#     cnty = factor(cnty) |> fct_reorder(hu_cnty_ac)
+#     ) |>
+#   filter(name == "2011_total") |> 
+#   ggplot() +
+#   geom_point(aes(reach_cnty_ac, hu_cnty_ac), size = 0.4) +
+#   geom_text(aes(reach_cnty_ac, hu_cnty_ac, label = cnty), size = 3) +
+#   facet_wrap(~name, scales = "free")
+# 
+
+```
 
 ::: {.content-hidden when-format="html" when-format="docx"}
 
@@ -1153,7 +1216,7 @@ d <- sf_wrias |>
 {
 ggplot(as_tibble(d), aes(pct)) + geom_boxplot(outliers = F) + 
   geom_jitter(aes(y = 0, size = catareasqkmrp100), position = position_jitter(height = 0.3), alpha = 0.5, show.legend = F) +
-  scale_x_continuous(labels = scales::percent, limits = c(0, 0.2)) +
+  scale_x_continuous(labels = scales::label_percent(), limits = c(0, 0.2)) +
     scale_size_area() +
   labs(
     title = "Area of 'rp100' as percentage of total 'cat' area", x = NULL, y = NULL,
@@ -1161,7 +1224,7 @@ ggplot(as_tibble(d), aes(pct)) + geom_boxplot(outliers = F) +
     theme(axis.text.y = element_blank())
   }/{
 ggplot(d) + geom_sf(aes(fill = pct)) +
-  scale_fill_continuous(labels = scales::percent) +
+  scale_fill_continuous(labels = scales::label_percent()) +
   labs(fill = "(rp100/cat)%")
 } + plot_layout(heights = c(1,3)/5)
 ```
@@ -1253,7 +1316,7 @@ sc_nlcd |>
       ) +
       coord_cartesian(clip = "off") +
       scale_fill_manual(values = pal_nlcd[grep(unique(.x$nlcd_class), names(pal_nlcd))]) + 
-      scale_y_continuous(labels = scales::comma) +
+      scale_y_continuous(labels = scales::label_comma()) +
       facet_wrap(~aoi, ncol = 2, strip.position = "top", scales = "free") +
       #facet_wrap(~aoi, ncol = 3, strip.position = "top", scales = "free") +
         labs(y = paste("acres", unique(.x$nlcd_class)), subtitle = unique(.x$nlcd_class)) +
@@ -1423,7 +1486,7 @@ sc_nlcd_ac_y_cnty |>
   ggplot(aes(nlcd_year, ac, group = cnty, fill = nlcd_class)) +
   geom_col(show.legend = F) +
   scale_x_continuous(breaks = c(2001, 2004, 2006, 2008, 2011, 2013, 2016, 2019)) + #unique(sc_nlcd_ac_y_cnty$nlcd_year)
-  scale_y_continuous(labels = scales::comma) +
+  scale_y_continuous(labels = scales::label_comma()) +
   scale_fill_manual(values = pal_nlcd[grep("urb", names(pal_nlcd))]) +
   facet_grid(rows = vars(cnty), cols = vars(nlcd_class), scales = "free_y") +
   labs(
@@ -1640,8 +1703,8 @@ d |>
     show.legend = T) +
     geom_abline(slope = 1, intercept = 0, linetype = 3) +
     wacolors::scale_color_wa_c("lopez", midpoint = 0) +
-    # scale_x_continuous(labels = scales::percent) +
-    # scale_y_continuous(labels = scales::percent) +
+    # scale_x_continuous(labels = scales::label_percent()) +
+    # scale_y_continuous(labels = scales::label_percent()) +
     facet_wrap(~cnty, ncol = 1, strip.position = "right") +
     theme(strip.text = element_text(size = 5), legend.position = "top") +
     labs(
