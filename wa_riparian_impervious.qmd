@@ -1,6 +1,5 @@
 ---
 title: "Assessing Riparian Impervious Cover Change in Washington State"
-author: "dan.auerbach@dfw.wa.gov"
 date: "`r Sys.Date()`"
 format:
   docx: 
@@ -21,7 +20,7 @@ format:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
   echo = FALSE, 
-  warning = FALSE, message = FALSE, fig.width = 8, fig.height = 10)
+  warning = FALSE, message = FALSE, fig.width = 7, fig.height = 9)
 
 library("tidyverse", quietly = T)
 library("sf")
@@ -47,6 +46,12 @@ sf_cnty <- sf::read_sf(file.path(dir_data_common, "WA_County_Boundaries/WA_Count
 
 #load(".RData")
 ```
+
+# Authors
+
+Dan Auerbach, RDE team, others
+
+# Abstract
 
 # Introduction
 
@@ -74,7 +79,7 @@ These studies demonstrate several of the factors that contribute quantitative un
 
 The accuracy of estimates based on these methods is likely to increase where land cover is relatively homogeneous and change areas are large relative to pixel resolution. But much of the ongoing addition of impervious cover in Washington is concentrated within heterogeneous mosaics of multiple land covers and is thought to derive from numerous distinct parcels, with change extents frequently smaller than the 0.09ha (0.22 acres) of a single 900m2 pixel. In Washington, however, impervious cover change has also been estimated from high resolution change detection (HRCD) processing of aerial imagery at 1m resolution (Pierce 2015). The HRCD approach combines automated classification of change polygons with extensive manual review and verification against before-after image pairs to generate a detailed dataset of alterations. 
 
-This analysis examines the intersection of these high resolution changes with a statewide polygon tessellation of riparian corridors derived from the SPTH200 standard. We describe landscape scale patterns of impervious increases and consider concurrent changes in human population and housing, as well as the positioning of new riparian imperviousness relative to salmon distribution within river networks.
+This analysis examines the intersection of these high resolution changes with a statewide polygon tessellation of riparian corridors derived from the SPTH200 standard. We also present a statewide assessment that uses readily available public land cover datasets. Based on these sources, we describe landscape scale patterns of impervious increases and consider concurrent changes in human population and housing, as well as the positioning of new riparian imperviousness relative to salmon distribution within river networks. 
 
 
 # Methods 
@@ -92,7 +97,7 @@ The short intervals between NAIP images tend to skew the estimated change probab
 Analysts used custom software to examine this "unlikely" sample and the set of all "likely" polygons (1-4% or roughly 1,000 - 40,000, depending on the location and time period). Visual comparison between image pairs confirmed changes, allowed assignment of a likely change agent, and addressed imperfections in the homogeneity of pixels within a change segment through assignment of categorical quartile values for the proportions of total change, lost tree canopy, new impervious surface, and new semi-pervious surface (e.g., new gravel roads). Assignment of the percent change categories introduced uncertainty due to accuracy (i.e., selection of 25% vs 50%) and imprecision (i.e., the true value falling within a 25% range). Finer divisions would tend to reduce the latter while increasing the former, but the inspection of millions of candidate change polygons has confirmed that this approach is logistically feasible way to generate a high quality dataset that captures many small changes at large regional scales.  
 
 
-## Riparian Data Engine: Intersection of change with riparian corridor
+## Riparian Data Engine: Change within a riparian corridor
 
 ```{r build_rde_wria_library, include=F, eval=FALSE}
 # #first DL csv
@@ -255,7 +260,7 @@ rde_cnty <- readRDS("~/T/DFW-Team WDFW Watershed Synthesis - data_common/rde/cnt
 
 ## OFM population and housing data
 
-Annual county-level housing units were accessed from the Washington Office of Financial Management (OFM) Data and Research [April 1 Postcensal Estimates](https://ofm.wa.gov/washington-data-research/population-demographics/population-estimates/historical-estimates-april-1-population-and-housing-state-counties-and-cities). These data 
+Annual county-level housing units were accessed from the Washington Office of Financial Management (OFM) Data and Research [April 1 Postcensal Estimates](https://ofm.wa.gov/washington-data-research/population-demographics/population-estimates/historical-estimates-april-1-population-and-housing-state-counties-and-cities).
 
 ```{r ofm_pop}
 #non-numeric special symbol flag cols starting after 1970
@@ -301,6 +306,141 @@ ofm_housing <- readxl::read_excel(
       str_detect(name, "special") ~ "other"
     )
   )
+
+```
+
+## StreamCat-processed NLCD
+
+The [`StreamCatTools`](https://github.com/USEPA/StreamCatTools) (Weber 2025) R package was used to access the [StreamCat dataset](https://www.epa.gov/national-aquatic-resource-surveys/streamcat-dataset) (Hill et al. 2016), which delivers consistently geoprocessed attribute values for each reach unit of the original medium resolution NHDPlus. Derived from a 30m DEM and sometimes termed "1:100K", this hydrography captures most substantial watercourses and is the precursor to subsequent higher-resolution continent-wide elevation derived hydrographic datasets that include many smaller channel units (i.e., NHDPlusHR from 10m DEM and 3DHP from LiDAR). For each reach 'comid', StreamCat provides attribute values from many landscape datasets that are processed within the local contributing catchment ('`cat`') as well as a 100m riparian buffer ('`rp100`') on "stream lines and on-network NLCD water pixels". 
+
+StreamCat includes values calculated from 8 cycles of the National Land Cover Dataset (NLCD; 2001, 2004, 2006, 2008, 2011, 2013, 2016, and 2019), which are based on random forest classification of satellite and other imagery sources [(Wickham et al. 2023)](https://www.tandfonline.com/doi/full/10.1080/15481603.2023.2181143). The StreamCat values represent the percentages of each of 16 land cover classes within each of the *cat* and *catrp100* areas of interest  (AOI), so that the sum across classes is 1 for each AOI (i.e., the *rp100* area is spatially nested, but `rp100` percentages are provided as distinct rather than proportional to the total *cat* area). Approximate acreages were calculated simply as:
+
+$$ acres = pct_{nlcd-class} * areasqkm_{cat|catrp100} * 247.11$$
+
+The StreamCat process and NLCD datasets have undergone thorough QAQC and been extensively reviewed since their initial development, resulting in their widespread use in various scientific studies. These data are a standardized, consistent means to investigate large-scale and cumulative patterns, but are unsuited to inferring site specific processes.
+
+```{r objects_sf}
+  
+# ##flowlines with WRIA added deduplicated via 'largest=T'
+# sf_flw <- sf::read_sf(file.path(dir_data_common, "NHDPlus17/NHDSnapshot/Hydrography/NHDFlowline.shp")) |>
+#   sf::st_transform(crs = sf::st_crs(epsg)) |>
+#   sf::st_zm() |>
+#   select(COMID, FCODE, FTYPE, LENGTHKM) |>
+#   rename_with(tolower) |>  
+#   st_join(sf_cnty, left = F, largest = T) |> #inner join
+#   st_join(sf_wrias |> select(wria, wria_nr_nm), left = F, largest = T) |> #inner join
+#   mutate(comid = as.character(comid))
+# saveRDS(sf_flw, file.path(dir_data_common, "NHDPlus17/sf_nhdp_wa_flw.rds"))
+sf_flw <- readRDS(file.path(dir_data_common, "NHDPlus17/sf_nhdp_wa_flw.rds"))
+
+# # ##catchment polys with WRIA added deduplicated via 'largest=T'
+# sf_cat <- sf::read_sf(file.path(dir_data_common, "NHDPlus17/NHDPlusCatchment/Catchment.shp")) |>
+#   sf::st_transform(crs = sf::st_crs(epsg)) |>
+#   select(comid = FEATUREID, areasqkm = AreaSqKM) |>
+#   st_join(sf_cnty, left = F, largest = T) |> #inner join
+#   st_join(sf_wrias |> select(wria, wria_nr_nm), left = F, largest = T) |>
+#   mutate(comid = as.character(comid))
+# saveRDS(sf_cat, file.path(dir_data_common, "NHDPlus17/sf_nhdp_wa_cat.rds"))
+sf_cat <- readRDS(file.path(dir_data_common, "NHDPlus17/sf_nhdp_wa_cat.rds"))
+
+# # ~608 comids along county borders are assigned different (appropriately, due to geometry+'largest')
+# #not splitting geometries (and attributes) so simpler is better
+# #visual inspection indicates flowlines should have precedence for associating to StreamCat/NLCD
+# mm <- inner_join(
+#   sf_cat |> as_tibble() |> select(comid, cnty_cat=cnty),
+#   sf_flw |> as_tibble() |> select(comid, cnty_flw=cnty),
+#   by = "comid"
+#   ) |> 
+#   filter(cnty_cat!=cnty_flw)
+# x <- sf_cat |> semi_join(mm, by = "comid")
+# y <- sf_flw |> semi_join(mm, by = "comid")
+# mapview::mapview(list(cat = x, flw = y, cnty = sf_cnty))
+
+# distinct(as_tibble(sf_flw), comid) #66116
+# distinct(as_tibble(sf_cat), comid) #57306
+# #flowlines with no cat are most pipelines & canalditch (~3K), a third of coastline
+# #but also many scattered streamriver and artificalpath statewide but large concentrations in yakima region
+# #cat with no flowlines are edge cases, a pothole depressional area SE of Okanagon plus a few other scattered Eastside
+
+```
+
+```{r objects_streamcat_nlcd}
+## recall riparian buffers are 100m, per https://www.epa.gov/national-aquatic-resource-surveys/streamcat-dataset-readme 
+ 
+# #pull all 4 AOI, including abs areasqkm
+# sc_wa_nlcd <- map(
+#   set_names(c(2001, 2004, 2006, 2008, 2011, 2013, 2016, 2019))
+#   ,
+#   ~StreamCatTools::sc_nlcd(
+#     state = "WA", year = .x,
+#     aoi = 'cat,catrp100,ws,wsrp100',
+#     showAreaSqKm = T
+#   ) |>
+#     rename_with(tolower) |> as_tibble() |>
+#     mutate(comid = as.character(comid), nlcd_year = .x)
+# )
+# saveRDS(sc_wa_nlcd, file.path(dir_data_common, "streamcat", "sc_wa_nlcd.rds"))
+
+# #removing 7 massive cross-border COMIDs mostly in BC; 6 are >1000km2, last is >350km2
+# sf_cat |> arrange(desc(areasqkm)) |> filter(areasqkm>1000) |> ggplot() + geom_sf() + geom_sf_text(aes(label = comid))
+# sf_cat |> filter(between(areasqkm,100,1000)) |> ggplot() + geom_sf(aes(fill=areasqkm)) + geom_sf_text(aes(label = comid))
+# filter(sf_cat, comid =="23031682")->x; mapview::mapview(x)
+comids_drop_BC <- filter(as_tibble(sf_cat), areasqkm>1000) |> distinct(comid) |> bind_rows(tibble(comid = "23031682"))
+
+#starting object with cat and catrp100 (no Ws)
+#inner_join against sf_cat to add WRIA 
+#then second inner_join against sf_flw to add County and get common set across all 3
+#dropping remaining comids with NA rp100
+#converting pcts to 0-1
+#appending 'ac[res]' cols as AOI-specific product of pct and areasqkm
+sc_nlcd <- readRDS(file.path(dir_data_common, "streamcat", "sc_wa_nlcd.rds")) |> 
+  map(
+    ~.x |> 
+      rename_with(
+        ~str_remove(.,paste(c(2001, 2004, 2006, 2008, 2011, 2013, 2016, 2019),collapse = "|")) |> 
+          str_remove("pct")
+        ) |> 
+      select(comid, nlcd_year, 
+             catareasqkm, catareasqkmrp100,
+             ends_with("cat"), ends_with("catrp100"))
+      ) |> 
+  list_rbind() |> 
+  anti_join(comids_drop_BC, by = "comid") |> 
+  inner_join(as_tibble(sf_cat) |> select(comid, wria, wria_nr_nm), by = "comid") |> 
+  inner_join(as_tibble(sf_flw) |> distinct(comid, cnty), by = "comid") |> 
+  drop_na(urbmdcatrp100) |> #single lu class captures all 231 comids NA for rp100 vals
+  mutate(
+    across(c(ends_with("cat"), ends_with("catrp100")), ~./100)
+    ,
+    # urb_cat = urbhicat + urbmdcat,
+    # urb_catrp100 = urbhicatrp100 + urbmdcatrp100
+    ,
+    across(ends_with("cat"), list(ac = ~.* catareasqkm * 247.11)),
+    across(ends_with("catrp100"), list(ac = ~.* catareasqkmrp100 * 247.11))
+    ) 
+
+sc_nlcd <- sc_nlcd |> 
+  select(
+    wria, wria_nr_nm, cnty,
+    comid, nlcd_year, 
+    catareasqkm, catareasqkmrp100,
+    all_of(sort(grep("cat$", colnames(sc_nlcd), value = T))),
+    all_of(sort(grep("catrp100$", colnames(sc_nlcd), value = T))),
+    all_of(sort(grep("cat_ac$", colnames(sc_nlcd), value = T))),
+    all_of(sort(grep("catrp100_ac$", colnames(sc_nlcd), value = T))),
+)
+
+#bring both sf to same 56879
+sf_flw <- sf_flw |> inner_join(distinct(sc_nlcd, comid), by = "comid") 
+sf_cat <- sf_cat |> inner_join(distinct(sc_nlcd, comid), by = "comid")
+
+pal_nlcd <- set_names(
+  c("brown","darkgreen","yellow","lightgreen","yellowgreen",
+    "yellow","seagreen","white","green","blue",
+    "tan","grey10","grey60","grey30","grey80","seagreen")
+  ,
+  str_remove(sort(grep("cat$", colnames(sc_nlcd), value = T)), "cat") 
+)    
 
 ```
 
@@ -408,11 +548,29 @@ sf_cnty_rde <- sf_cnty |>
 
 ```
 
+```{r sc_nlcd_year_sum}
+sc_nlcd_year_sum <- sc_nlcd |> 
+  summarise(
+    across(
+      contains("urb") & ends_with("ac"),
+      list(sum = ~sum(.))
+    )
+    , .by = c(nlcd_year)
+  ) |> 
+  pivot_longer(cols = -nlcd_year, values_to = "ac") |> 
+  mutate(
+    aoi = if_else(str_detect(name, "rp100"), "rp100", "cat"),
+    nlcd_class = str_remove(name, "cat") |> str_remove("rp100") |> str_remove("_ac_sum"),
+    name = NULL,
+    ha = ha*ac
+    )
+```
+
 Results are presented for the full "riparian corridor" composed of the RMZ, EOW, and floodplain polygons associated with each reach unit. As noted previously, values presented relative to the stratification by county geographic boundaries reflect various combinations of federal, tribal, state, and municipal regulatory regimes, and are not due to the actions of a single management authority.
 
 Statewide, the assessed reaches totaled `r round(wa_imp$reach_ha[4])` hectares, with `r round(wa_imp$rmz_ac[4]/wa_imp$reach_ac[4],3)`% consisting of RMZ (supp. fig 1). Variation in the NHD, soils and floodplain data underlying the polygon tessellation contributed to differences in the overall and proportional extent of the assessed riparian corridor throughout the state, both between and within county boundaries, but total reach area was an average of approximately 22% (median 17.3%, IQR 11.9% - 28.4%) of full county area (@fig-multi_map A, supp. fig 2). The largest areas of reaches associated with the distribution of Chinook salmon were in central and northern Puget Sound, with population and housing values also highest in the vicinity of Seattle, the state's largest urban area (@fig-multi_map B-D).
 
-```{r gg_multi_map}
+```{r}
 #| label: fig-multi_map
 
 #as_tibble(sf_cnty_rde) |> mutate(pct = reach_ac/cnty_ac) |> pull(pct) |> summary()
@@ -475,7 +633,7 @@ During the 2011-2017 period in these HRCD data, an estimated `r round(wa_imp$imp
 
 The additional area of impervious cover in non-salmon reaches was similar to that of reaches associated with Chinook distribution, but this new impervious area was an order of magnitude higher percentage of the assessed riparian corridor in Chinook-associated reaches (0.1% vs 0.01%, @tab-statewide, @fig-statewide_swifd).
 
-```{r gt_statewide}
+```{r}
 #| label: tab-statewide
 
 wa_imp |> 
@@ -490,7 +648,7 @@ wa_imp |>
   
 ```
 
-```{r gg_statewide_swifd}
+```{r}
 #| label: fig-statewide_swifd
 
 rde_cnty_swifd <- rde_cnty |> 
@@ -561,7 +719,7 @@ rde_cnty |>
 
 ```
 
-```{r gg_impv_inc_per_rch_boxes}
+```{r}
 #| label: fig-impv_inc_per_rch_boxes
 
 # rde_cnty |> 
@@ -598,12 +756,86 @@ rde_cnty |>
   labs(y = NULL, x = "hectares",
        subtitle = "Per-reach impervious cover increases up to 0.4 ha (1 acre)")
 } + 
-  plot_layout(heights = c(1/4,3/4), tag_level = "A")
+  plot_layout(heights = c(1/4,3/4)) + 
+  plot_annotation( tag_levels = "A")
+```
+
+Qualitatively similar statewide estimates of riparian impervious change result from the high and medium urban NLCD cover classes (>80% and 50-80% impervious respectively) within the StreamCat 100m buffer on NHDPlus watercourses. Differencing the 2011 and 2016 imagery years yields an increase of `r 30157-28642`ha (@tab-sc_statewide) for the combination of these classes, and a simple OLS linear regression on NLCD year indicates an average annual increase of approximately 338ha/year for the sum of both classes during the full 2001-2019 period (@fig-sc_nlcd_statewide_urb_year; approx. 73ha/yr for high, 265ha/yr medium). The low and open urban NLCD classes are designated as representing 50-20% and <20% impervious respectively, and the associated total area therefore includes considerable non-impervious surface. Nonetheless, despite the modest decline in the urban open NLCD class, including these did not alter the basic pattern of overall increase since 2001 and during the focal HRCD years. 
+
+```{r}
+#| label: tab-sc_statewide
+
+# sc_nlcd_year_sum |> 
+#   mutate(across(c(ha, ac), round)) |> 
+#   pivot_wider(names_from = aoi, values_from = c(ha, ac)) |> 
+#   gt(groupname_col = "nlcd_year") |>
+#   summary_rows(columns = starts_with("ha"), fns = list(total = ~sum(.)),
+#                fmt = ~fmt_number(., decimals = 0)) |> 
+#   fmt_number(columns = c(starts_with("ha"), starts_with("ac")), decimals = 0)
+
+sc_nlcd_year_sum |> 
+  mutate(across(c(ha, ac), round)) |> 
+  filter(aoi == "rp100") |> select(-ac) |> 
+  pivot_wider(names_from = nlcd_class, values_from = c(ha)) |> 
+  mutate(
+    hi_md = urbhi + urbmd,
+    hi_md_lo = urbhi + urbmd + urblo
+    ) |>
+  select(nlcd_year, High = urbhi, Medium = urbmd, Low = urblo, Open = urbop, `H+M` = hi_md, `H+M+L` = hi_md_lo) |> 
+  gt(rowname_col = "nlcd_year", caption = "Est. hectares NLCD urban cover in StreamCat 100m riparian buffer") |>
+  fmt_number(columns = !contains("nlcd"), decimals = 0) |> 
+  tab_style(style = cell_fill(), locations = cells_body(columns = "H+M")) |> 
+  tab_style(style = cell_text(weight = 'bold'), locations = cells_body(columns = "H+M", rows = nlcd_year %in% c(2011, 2016)))
+
+# lm(
+#   ha ~ nlcd_year,
+#   data = sc_nlcd_year_sum |>
+#     filter(aoi == "rp100", 
+#            #str_detect(nlcd_class,"hi|md")
+#            # str_detect(nlcd_class,"hi")
+#            str_detect(nlcd_class,"md")
+#            ) |>
+#     summarise(across(ha, sum), .by = nlcd_year)
+#   ) |>
+#   broom::tidy()
+#mid range 0.9*73 + 0.65*265 ~= 238/y is still > 160/y
+#but low end: 0.8*73 + 0.5*265 ~191 is awfully close
+
+```
+
+```{r}
+#| label: fig-sc_nlcd_statewide_urb_year
+
+sc_nlcd_year_sum |> 
+  filter(aoi == "rp100") |> select(-ac) |> 
+  mutate(nlcd_class = factor(nlcd_class, levels = c("urbhi","urbmd","urblo","urbop"))) |> 
+  ggplot(aes(nlcd_year, ha, group = nlcd_class, fill = nlcd_class)) +
+  geom_col(show.legend = F) +
+  # ggpmisc::stat_poly_line(se = F, show.legend = F) +
+  # #ggpmisc::stat_poly_eq(ggpmisc::use_label(c("adj.R2", "p"))) +
+  # ggpmisc::stat_fit_tidy(
+  #       method = "lm",
+  #       label.x = "left", label.y = "top", vjust = -0.7,
+  #       method.args = list(formula = y ~ x),
+  #       mapping = aes(
+  #         label = sprintf(
+  #           "est. slope = %.0f/yr", #"Slope = %.3g\np-value = %.3g",
+  #           after_stat(x_estimate)#, after_stat(x_p.value)
+  #           )
+  #         ) #, color = "blue"
+  #     ) +
+  scale_fill_manual(values = pal_nlcd) +
+  scale_y_continuous(labels = scales::label_comma()) +
+  coord_cartesian(clip = "off") +
+  facet_wrap(~nlcd_class, scales = "free", 
+             labeller = as_labeller(c('urbhi' = "A: High", 'urbmd' = 'B: Med.', 'urblo' = 'C: Low', 'urbop' = 'D: Open'))) +
+  theme(strip.text = element_text(hjust = 0.1))
+  
 ```
 
 When aggregated by county boundaries, the largest impervious increases were concentrated in more heavily urbanized portions of the state, congruent with expectations based on the geographic distributions of population and housing. Summed change areas were greatest in proximity to the large and rapidly growing metropolitan areas of Seattle, Tacoma, and Vancouver in western Washington (King, Pierce, Clark) and Spokane and the Tri-Cities in the east (@fig-impv_inc_ha_map).
 
-```{r gg_impv_inc_ha_map}
+```{r}
 #| label: fig-impv_inc_ha_map
  
 #can add Oly and Yakima, Pasco/Richland etc. with str_detect(name)
@@ -629,39 +861,9 @@ sf_cnty_rde |>
 
 ```
 
-```{r gg_nonfstry_impv_inc_ac_per_100ac_vs_abs, echo=F, eval=F}
-{
-rde_cnty_sum |> 
-  ggplot(aes(impv_inc_ac, impv_inc_ac_per_100ac)) +
-  geom_point(size = 0.3, show.legend = F) + 
-  geom_text(aes(label = cnty), size = 3, check_overlap = F,
-            #nudge_x = 3, 
-            hjust = 0, vjust = 1.2,
-            #position = position_dodge(width = 0.01),
-            show.legend = F) + 
-  #geom_smooth(method = "lm") +
-      coord_cartesian(xlim = c(100, 650), ylim = c(0.02, 0.18), expand = F) +
-  labs(
-    x = "Total acres", y = "Acres imp. inc. per 100ac",
-    title = "Impervious increases by county,\narea normalized vs absolute area") 
-}/{
-rde_cnty_sum |> 
-  ggplot(aes(impv_inc_ac, impv_inc_ac_per_100ac)) +
-  geom_point(size = 0.3, show.legend = F) + 
-  geom_text(aes(label = cnty), size = 3, check_overlap = T,
-            nudge_x = 0.5, hjust = 0,
-            show.legend = F) + 
-  #geom_smooth(method = "lm") +
-  coord_cartesian(xlim = c(0,75), ylim = c(0, 0.08)) +
-  labs(
-    x = "Total acres", y = "Acres imp. inc. per 100ac",
-    subtitle = "Counties with <75ac total increase") 
-}
-```
-
 Normalizing impervious increase by the total riparian corridor (i.e., summed reach area within county boundary) highlighted differences in the relative density of change (@fig-impv_inc_ac_pct_reach). King county's boundaries contained the largest aggregate increase, but those within Pierce and Clark county extents both formed a larger proportion of the assessed area. Conversely, though total increases were smaller within the Kitsap, Island, and Benton boundaries, these changes made up higher proportions of the riparian corridor.
 
-```{r gg_impv_inc_ac_pct_reach}
+```{r}
 #| label: fig-impv_inc_ac_pct_reach
 
 {
@@ -693,7 +895,7 @@ rde_cnty_sum |>
 
 Population increases during 2011-2017 were positively correlated with the normalized impervious increase in the riparian corridor, but considerable variation was evident among county-boundary aggregates. For example, the King and Clark areas had population gains greater than that within the Pierce boundary, but smaller proportional impervious increases. Conversely, the Kitsap extent had the fourth largest normalized impervious increase despite less population growth than many other areas (@fig-impv_inc_pop_change). A comparable pattern was evident for changes in housing units, with substantial variation around a generally positive correlation (@fig-impv_inc_housing_change). The King and Island county extents were notable for the, respectively, large and small housing gains relative to proportional riparian corridor impervious additions. 
 
-```{r gg_impv_inc_pop_change}
+```{r}
 #| label: fig-impv_inc_pop_change
 
 # rde_cnty_sum |>
@@ -728,7 +930,7 @@ rde_cnty_sum |>
   
 ```
 
-```{r gg_impv_inc_housing_change}
+```{r}
 #| label: fig-impv_inc_housing_change
 
 rde_cnty_sum |>
@@ -744,66 +946,32 @@ rde_cnty_sum |>
 
 ```
 
-
-
-
-
-*Streamcat/NLCD?!?*
-
-
 # Discussion
 
-We analyzed high resolution land cover change data within an ecologically-grounded riparian corridor to quantify the magnitude of new impervious area in Washington state during the early part of the 21st century. A statewide estimate of `r round(0.4*wa_imp$nonfstry_impv_inc_ac)` (`r round(wa_imp$nonfstry_impv_inc_ac)` acres) during the period from 2011 to 2017 represented `r round(wa_imp$nonfstry_impv_inc_ac / wa_imp$reach_ac, 5)`% of the total assessed extent, which encompassed a SPTH200 RMZ and adjacent floodplains. This estimate might be viewed simultaneously as a small portion of the entire riparian corridor and as a large new addition to an ecohydrologically sensitive zone in watersheds already subject to extensive alteration.
-  
-## [Caveats]
+We analyzed high resolution land cover change data within an ecologically-grounded riparian corridor to quantify the magnitude of new impervious area in Washington state. A statewide estimate of `r round(wa_imp$impv_inc_ha[4])`ha (`r round(wa_imp$impv_inc_ac[4])` acres) during 2011 to 2017 represented `r round(100*wa_imp$impv_reach_pct[4], 3)`% of the total assessed extent. This estimate might be viewed as both a small portion of the entire riparian corridor and a large new addition to a sensitive portion of watersheds already subject to extensive alteration.
 
-Riparian buffer dimensions that influence ongoing permitting, timber harvest, and other management actions are far from uniform, with a range of legally stipulated values in state regulations and local critical area ordinances (Folkerts et al. 2020), in addition to the heterogeneity in realized on-the-ground conditions within any particular jurisdiction (Swartz et al 2024). The 200-year Site Potential Tree Height standard in WDFW guidance has policy influence as a formulation of best available science, but it does not necessarily determine the footprint of protected areas. The full riparian corridor examined in this analysis does not represent any specific jurisdiction and is likely to encompass what are frequently narrower or smaller management zones. Accordingly, these results are likely an over-estimate relative to the (highly varied) mosaic of currently binding distances. However, the corridor in this assessment is likely to have hydrologic and ecological significance to in-channel conditions regardless of its legal circumstances, and the RDE RMZ tessellation is itself based on underlying hydrography (NHD) that is missing extensive lengths of the smaller, sometimes intermittent or ephemeral components of drainage networks that significantly contribute to water quantity and quality (Brinkerhoff et al 2024). These factors increase the likelihood that this analysis under-estimates the overall magnitude of functional impacts to aquatic ecosystems due to new impervious cover. 
+Riparian buffer dimensions that define the jurisdictional extent of management regimes far from uniform, with a range of legally stipulated values in state regulations and local critical area ordinances (Folkerts et al. 2020). This legal variation is in addition to the heterogeneity in realized on-the-ground conditions within any particular management domain (Swartz et al 2024). The 200-year Site Potential Tree Height standard in WDFW guidance has policy influence as a formulation of best available science, but it does not necessarily determine the footprint of protected areas. 
 
-In addition to the hydrographic error and that in the site index values on which SPTH200 dimensions are based, some residual error persists in the high resolution change polygons despite their manual review. This composite set of factors prevents a straightforward quantification of uncertainty, but as a coarse indication of possible bounds on these estimates, imposing arbitrary 25% factors yields a range from `r 0.4*0.75*rde_cnty_swifd$nonfstry_impv_inc_ac[3]` to  `0.4*1.25*rde_cnty_swifd$nonfstry_impv_inc_ac[3]` in the total hectares of 2011-17 new impervious cover in Chinook-associated reaches. Even the low end of this range raises questions about whether a "no net loss" standard can have been met: if hundreds of acres of impervious cover are not being removed each year, what actions have offset those that are being added?
+The full riparian corridor examined in this analysis does not represent any specific authority, and it is broader than many current management zones. These results may therefore over-estimate new impervious cover relative to the highly varied mosaic of currently binding buffer distances. Regardless of legal circumstances, however, the assessed corridor has hydrologic and ecological significance to in-channel conditions, and the RDE RMZ tessellation is based on hydrography (NHD) that is missing extensive lengths of the smaller, sometimes intermittent or ephemeral channels that contribute significantly to water quantity and quality (Brinkerhoff et al 2024). These factors increase the likelihood that this analysis under-estimates the overall functional impacts to aquatic ecosystems. 
 
-Moreover, the addition of upland imperviousness outside of this or any other assessed corridor from 10m to 100m is highly likely to affect riparian and in-channel conditions (i.e., a 30m "buffer" is unlikely to have the same function as part of a continuous forest versus as a distinct strip adjacent to converted land). Beyond site-specific slope and soils factors, the concurrent surrounding watershed context has inevitably shaped our understanding of the functional dimensions that underlie buffer formulations. But the applicability of distance-decay curves likely warrants review as increasing imperviousness continues to alter flow paths (e.g., away from saturation excess and towards infiltration excess dynamics). While an SPTH standard allows for some flexibility to avoid prescribing a single critical area dimension, the basic concept may be invalidated where upland surface alteration has rendered even some multiple of SPTH (2x or 5x etc.) insufficient to perform all desired functions.
+In addition to the uncertainty in hydrography and site index values on which SPTH200 dimensions are based, some residual error persists in the high resolution change polygons despite their manual review. These sources combine to prevent a straightforward estimate of the full uncertainty in the presented values. However, convergence of the independent RDE-HRCD and StreamCat-NLCD approaches presented here, as well as the estimates developed by Lazarus (2023), lends confidence to an estimate in the hundreds of hectares a year. Even imposing an arbitrary 25% reduction still produces values on this order of magnitude. This raises questions about whether regulation and permitting subject to a project-specific "no net loss" standard can have achieved the preservation of function at a cumulative scale. If hundreds of acres of impervious cover are not being removed each year, what actions have offset those that are being added?
 
-- This comparison indicates only general patterns in the configuration of land cover conversion because changes included various anthropogenic causes such as roads, warehouses, etc., and were not restricted to residential construction. Nonetheless, the variation in this relationship highlights the potential for housing gains to come at quite divergent costs in riparian condition.
-- reiterate that counties are NOT replicates
-- east vs west considerations?
+Moreover, the addition of upland imperviousness outside of this or any other assessed corridor from 10m to 100m has some effect on riparian and in-channel conditions (e.g., a 30m "buffer" is unlikely to have the same function within a primarily forested catchment as it does as a distinct strip adjacent to converted land). Beyond site-specific slopes and soils, the surrounding watershed context for data collection and analysis has inevitably shaped our understanding of the functional dimensions that underlie buffer formulations. The applicability of distance-decay curves likely warrants review as increasing upland imperviousness continues to alter flow paths away from saturation-excess and towards infiltration-excess dynamics. While an SPTH standard allows for some flexibility to avoid prescribing a single critical area dimension, the basic concept may be invalidated where upland surface alteration has rendered even some simple multiple of SPTH (2x or 5x etc.) insufficient to perform all desired functions.
 
+This comparison indicates only general patterns in the configuration of land cover conversion, with various anthropogenic changes such as roads, warehouses, and other commercial spaces combined with those due to residential construction. Moreover, the summarization of changes within county boundary extents did not generate replicates suited to statistical contrast without additional longitudinal observations; as noted, these "counties" included multiple authorities, had varying hydrographic error, and are affected by distinct socio-ecological histories. Nonetheless, the variation among them in the relationships between area-normalized impervious increases, population, and housing suggests the potential for growth to come at different costs in terms of riparian condition and function (@fig-impv_inc_pop_change). Lambert et al. (2025), offered a related empirical demonstration of the alternative outcomes for habitat from policies shaping land use, showing that similar housing gains in western Washington census block groups were accompanied by substantially different amounts of tree canopy loss. Further study is needed to better disentangle the complex set of interacting factors that likely contributed to the range in riparian impervious increases accompanying similar population changes.
 
-## [Connections]
-
-These results were broadly in agreement with prior studies at coarser resolutions and/or smaller scales.
-  - Lazarus
-  - StreamCat rp100 NLCDurbhimd 11700/18 = ~650ac/y?
 
 ## Next steps
 
-  - Process 2021 1m imperv CCAP/Ecopia to SPTH200?
+  - more on SWIFD/Chinook?
 
   - 3DHP RMZs from geomorphically informed SPTH200 
   
-  - stormwater tie in(s)? 
+  - Stormwater, 6PPDQ (coho)
 
-  - Lambert et al. 2025
+  - [task force recs](https://ofm.wa.gov/sites/default/files/public/publications/RiparianTaskforcePreliminaryRecommendationsMay2024.pdf)
 
-## other notes
-
-- RDE/HRCD
-
-  - independently verify that HRCD is exclusively 2011-17?
-  - presentation of county/larger aggregates that mix reaches with/without floodplain (since no 'zone' attrib in API tables)
-  - SWIFD stratification?
-  
-- SC/NLCD
-
-  - rethink whether d_cat_rp100 are valid: if cat is X% giving 10ac and rp100 is Y% giving 10ac, is 0ac d_cat_rp100 always accurate?
-  - micro-acreage filter to exclude possible spurious urbhimd noise in forests/river gravels
-  - stratify by bfw within county, either 5/25m akin to Bartz or examine distro and pick percentile values
-  - what other figs/tables?
-    - finish refactoring arrowswarm?
-    - bring back/do new other change from-to? (e.g. not all imper inc associated with forest decrease)
-
-- [task force recs](https://ofm.wa.gov/sites/default/files/public/publications/RiparianTaskforcePreliminaryRecommendationsMay2024.pdf)
-
-- Add county level population change numbers? fit: urb_ac_rp100 ~ year + pop + housing
+  - Add county level population change numbers? fit: urb_ac_rp100 ~ year + pop + housing
   - capture that per-person increases decreasing even as abs continues to increase? or just use bookend pop numbers [now seeing this was done in Powell et al (fig 6, continuously) and Bartz et al (text, bookends)]
  
 
@@ -829,18 +997,9 @@ Subedi, M.R., Portillo-Quintero, C., Kahl, S.S., McIntyre, N.E., Cox, R.D. and P
 https://www.ingentaconnect.com/contentone/asprs/pers/2023/00000089/00000009/art00007?crawler=true&mimetype=application/pdf
 
 
-
-ScholarGPT via Ken M: 
->Comparative Insight:
-20th Century Industrialization Phase: Characterized by aggressive land clearing for agriculture, timber, and heavy industrial operations, leading to direct and large-scale riparian buffer destruction.
-21st Century Urbanization: Expansion is less aggressive per unit area but more pervasive, leading to cumulative impacts over broader areas due to residential, infrastructural, and commercial suburban sprawl.
-Conclusion:
-While the scale and patterns of impervious surface expansion have shifted from concentrated industrial footprints in the 20th century to more distributed urban/suburban expansion in the 21st, the net effect has been a continued loss of riparian function and buffer integrity across Washington State. Despite improved regulatory frameworks, growth management efforts have only partially mitigated these trends.
-
-
 # Conclusion
 
-Washington is a leader in careful land and water use management, striving to encourage vibrant human communities without compromising the natural systems that make them possible. Yet at a statewide scale, high resolution data indicate that each year hundreds of acres are still being converted to impervious surface in ecohydrologically sensitive locations.
+Washington is a leader in careful land and water use management, striving to encourage vibrant human communities without compromising the natural systems that make them possible. Yet at a statewide scale, high resolution data indicate that hundreds of acres are still being converted to impervious surface each year within sensitive riparian corridors. Attention to this ongoing change will be critical to continued progress towards salmon recovery and other valued aspects of ecological integrity.
 
 # Acknowledgements
 
@@ -990,147 +1149,37 @@ rde_cnty |>
 
 ```
 
+```{r gg_nonfstry_impv_inc_ac_per_100ac_vs_abs, echo=F, eval=F}
+{
+rde_cnty_sum |> 
+  ggplot(aes(impv_inc_ac, impv_inc_ac_per_100ac)) +
+  geom_point(size = 0.3, show.legend = F) + 
+  geom_text(aes(label = cnty), size = 3, check_overlap = F,
+            #nudge_x = 3, 
+            hjust = 0, vjust = 1.2,
+            #position = position_dodge(width = 0.01),
+            show.legend = F) + 
+  #geom_smooth(method = "lm") +
+      coord_cartesian(xlim = c(100, 650), ylim = c(0.02, 0.18), expand = F) +
+  labs(
+    x = "Total acres", y = "Acres imp. inc. per 100ac",
+    title = "Impervious increases by county,\narea normalized vs absolute area") 
+}/{
+rde_cnty_sum |> 
+  ggplot(aes(impv_inc_ac, impv_inc_ac_per_100ac)) +
+  geom_point(size = 0.3, show.legend = F) + 
+  geom_text(aes(label = cnty), size = 3, check_overlap = T,
+            nudge_x = 0.5, hjust = 0,
+            show.legend = F) + 
+  #geom_smooth(method = "lm") +
+  coord_cartesian(xlim = c(0,75), ylim = c(0, 0.08)) +
+  labs(
+    x = "Total acres", y = "Acres imp. inc. per 100ac",
+    subtitle = "Counties with <75ac total increase") 
+}
+```
+
 ::: {.content-hidden when-format="html" when-format="docx"}
-
-## StreamCat-processed NLCD
-
-The [`StreamCatTools`](https://github.com/USEPA/StreamCatTools) (Weber 2025) R package was used to access the [StreamCat dataset](https://www.epa.gov/national-aquatic-resource-surveys/streamcat-dataset) (Hill et al. 2016), which delivers consistently geoprocessed attribute values for each reach unit of the original medium resolution NHDPlus hydrography. Derived from a 30m DEM and sometimes termed "1:100K", this captures most substantial watercourses and is the precursor to subsequent higher-resolution continent-wide elevation derived hydrographic datasets that include many smaller channel units (i.e., NHDPlusHR from 10m DEM and 3DHP from LiDAR). For each reach 'comid', StreamCat provides attribute values from many raster and rasterized datasets that are processed within the local contributing catchment ('`cat`') as well as a 100m riparian buffer ('`rp100`') on "stream lines and on-network NLCD water pixels". 
-
-*Not yet using Ws/Wsrp100, but add description here if added below*
-
-```{r objects_sf, include=F, eval=F}
-  
-# ##flowlines with WRIA added deduplicated via 'largest=T'
-# sf_flw <- sf::read_sf(file.path(dir_data_common, "NHDPlus17/NHDSnapshot/Hydrography/NHDFlowline.shp")) |>
-#   sf::st_transform(crs = sf::st_crs(epsg)) |>
-#   sf::st_zm() |>
-#   select(COMID, FCODE, FTYPE, LENGTHKM) |>
-#   rename_with(tolower) |>  
-#   st_join(sf_cnty, left = F, largest = T) |> #inner join
-#   st_join(sf_wrias |> select(wria, wria_nr_nm), left = F, largest = T) |> #inner join
-#   mutate(comid = as.character(comid))
-# saveRDS(sf_flw, file.path(dir_data_common, "NHDPlus17/sf_nhdp_wa_flw.rds"))
-sf_flw <- readRDS(file.path(dir_data_common, "NHDPlus17/sf_nhdp_wa_flw.rds"))
-
-# # ##catchment polys with WRIA added deduplicated via 'largest=T'
-# sf_cat <- sf::read_sf(file.path(dir_data_common, "NHDPlus17/NHDPlusCatchment/Catchment.shp")) |>
-#   sf::st_transform(crs = sf::st_crs(epsg)) |>
-#   select(comid = FEATUREID, areasqkm = AreaSqKM) |>
-#   st_join(sf_cnty, left = F, largest = T) |> #inner join
-#   st_join(sf_wrias |> select(wria, wria_nr_nm), left = F, largest = T) |>
-#   mutate(comid = as.character(comid))
-# saveRDS(sf_cat, file.path(dir_data_common, "NHDPlus17/sf_nhdp_wa_cat.rds"))
-sf_cat <- readRDS(file.path(dir_data_common, "NHDPlus17/sf_nhdp_wa_cat.rds"))
-
-# # ~608 comids along county borders are assigned different (appropriately, due to geometry+'largest')
-# #not splitting geometries (and attributes) so simpler is better
-# #visual inspection indicates flowlines should have precedence for associating to StreamCat/NLCD
-# mm <- inner_join(
-#   sf_cat |> as_tibble() |> select(comid, cnty_cat=cnty),
-#   sf_flw |> as_tibble() |> select(comid, cnty_flw=cnty),
-#   by = "comid"
-#   ) |> 
-#   filter(cnty_cat!=cnty_flw)
-# x <- sf_cat |> semi_join(mm, by = "comid")
-# y <- sf_flw |> semi_join(mm, by = "comid")
-# mapview::mapview(list(cat = x, flw = y, cnty = sf_cnty))
-
-# distinct(as_tibble(sf_flw), comid) #66116
-# distinct(as_tibble(sf_cat), comid) #57306
-# #flowlines with no cat are most pipelines & canalditch (~3K), a third of coastline
-# #but also many scattered streamriver and artificalpath statewide but large concentrations in yakima region
-# #cat with no flowlines are edge cases, a pothole depressional area SE of Okanagon plus a few other scattered Eastside
-
-```
-
-StreamCat includes values calculated from 8 cycles of the National Land Cover Dataset: 2001, 2004, 2006, 2008, 2011, 2013, 2016, and 2019. The NLCD rasters are based on random forest classification of satellite and other imagery sources [(Wickham et al. 2023)](https://www.tandfonline.com/doi/full/10.1080/15481603.2023.2181143). The StreamCat values represent the percentages of each of 16 land cover classes within each of the *cat* and *catrp100* areas of interest  (AOI), so that the sum across classes is 1 for each AOI (i.e., the *rp100* area is spatially nested, but `rp100` percentages are provided as distinct rather than proportional to the total *cat* area). Approximate acreages were back-calculated simply as:
-
-$$ acres = pct_{nlcd-class} * areasqkm_{cat|catrp100} * 247.11$$
-
-The StreamCat process and NLCD datasets have undergone thorough QAQC and been extensively reviewed since their initial development, resulting in their widespread use in various scientific studies (see Wickham et al 2023 for the most recent NLCD validation study). Nonetheless, as with any remote sensed empirical data, errors persist, and several key caveats are important to note.
-
-  - The underlying hydrographic flowlines and associated catchment polygon mesh have positional error; not all streams, drainage divides, and/or riparian buffer corridors are 'where they should be'.
-  - Within any particular NLCD year, substantial ground level variation can occur within the 30m pixel resolution, such that the single cover class assigned to the pixel may poorly describe the actual heterogenity (stated differently, the per-pixel suitability of classification will tend to increase with homogeneity of cover types). 
-  - Between different NLCD years, a change in NLCD class may be due to sudden, substantial activity (e.g., a clear cut; fallowing or crop rotation; a new parking lot); to gradual, accumulative shifts of the fine-scale mix of types within-pixel; or potentially to spurious artifacts rather than any actual ground-level change.
-
-Accordingly, these data are a standardized, consistent means to investigate larger-scale, general or cumulative patterns, and are not suited to inferring site specific processes or causes.
- 
-```{r objects_streamcat_nlcd, include=F, eval=F}
-## recall riparian buffers are 100m, per https://www.epa.gov/national-aquatic-resource-surveys/streamcat-dataset-readme 
- 
-# #pull all 4 AOI, including abs areasqkm
-# sc_wa_nlcd <- map(
-#   set_names(c(2001, 2004, 2006, 2008, 2011, 2013, 2016, 2019))
-#   ,
-#   ~StreamCatTools::sc_nlcd(
-#     state = "WA", year = .x,
-#     aoi = 'cat,catrp100,ws,wsrp100',
-#     showAreaSqKm = T
-#   ) |>
-#     rename_with(tolower) |> as_tibble() |>
-#     mutate(comid = as.character(comid), nlcd_year = .x)
-# )
-# saveRDS(sc_wa_nlcd, file.path(dir_data_common, "streamcat", "sc_wa_nlcd.rds"))
-
-# #removing 7 massive cross-border COMIDs mostly in BC; 6 are >1000km2, last is >350km2
-# sf_cat |> arrange(desc(areasqkm)) |> filter(areasqkm>1000) |> ggplot() + geom_sf() + geom_sf_text(aes(label = comid))
-# sf_cat |> filter(between(areasqkm,100,1000)) |> ggplot() + geom_sf(aes(fill=areasqkm)) + geom_sf_text(aes(label = comid))
-# filter(sf_cat, comid =="23031682")->x; mapview::mapview(x)
-comids_drop_BC <- filter(as_tibble(sf_cat), areasqkm>1000) |> distinct(comid) |> bind_rows(tibble(comid = "23031682"))
-
-#starting object with cat and catrp100 (no Ws)
-#inner_join against sf_cat to add WRIA 
-#then second inner_join against sf_flw to add County and get common set across all 3
-#dropping remaining comids with NA rp100
-#converting pcts to 0-1
-#appending 'ac[res]' cols as AOI-specific product of pct and areasqkm
-sc_nlcd <- readRDS(file.path(dir_data_common, "streamcat", "sc_wa_nlcd.rds")) |> 
-  map(
-    ~.x |> 
-      rename_with(
-        ~str_remove(.,paste(c(2001, 2004, 2006, 2008, 2011, 2013, 2016, 2019),collapse = "|")) |> 
-          str_remove("pct")
-        ) |> 
-      select(comid, nlcd_year, 
-             catareasqkm, catareasqkmrp100,
-             ends_with("cat"), ends_with("catrp100"))
-      ) |> 
-  list_rbind() |> 
-  anti_join(comids_drop_BC, by = "comid") |> 
-  inner_join(as_tibble(sf_cat) |> select(comid, wria, wria_nr_nm), by = "comid") |> 
-  inner_join(as_tibble(sf_flw) |> distinct(comid, cnty), by = "comid") |> 
-  drop_na(urbmdcatrp100) |> #single lu class captures all 231 comids NA for rp100 vals
-  mutate(
-    across(c(ends_with("cat"), ends_with("catrp100")), ~./100)
-    ,
-    # tree_cat = conifcat + decidcat + mxfstcat,
-    # tree_catrp100 = conifcatrp100 + decidcatrp100 + mxfstcatrp100,
-    urb_cat = urbhicat + urbmdcat,
-    urb_catrp100 = urbhicatrp100 + urbmdcatrp100
-    ,
-    across(ends_with("cat"), list(ac = ~.* catareasqkm * 247.11)),
-    across(ends_with("catrp100"), list(ac = ~.* catareasqkmrp100 * 247.11))
-    )
-
-#bring both sf to same 56879
-sf_flw <- sf_flw |> inner_join(distinct(sc_nlcd, comid), by = "comid") 
-sf_cat <- sf_cat |> inner_join(distinct(sc_nlcd, comid), by = "comid")
-
-
-pal_nlcd <- set_names(
-  c("brown","darkgreen","yellow","lightgreen","yellowgreen",
-    "yellow","seagreen","white","green","blue",
-    "tan","grey10","grey60","grey30","grey80","seagreen")
-  ,
-  grep("catrp100_ac", names(sc_nlcd), value = T)[1:16] |> 
-    str_remove("catrp100_ac") |> sort()
-)
-
-#testing focal set
-wrias <- as.character(c(1,7,8,10,15, 28,32,37,45,57))
-
-#save.image("sc_ripcorr_nlcd.RData")
-```
 
 ## 2001 Baseline
 
