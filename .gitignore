@@ -8,6 +8,7 @@
 
 #saved single objects
 *.rds
+*.gpkg
 
 # User-specific files
 .Ruserdata
