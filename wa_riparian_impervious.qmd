@@ -999,56 +999,39 @@ rde_impv |>
 
 # Discussion
 
-Cumulative assessments of land cover change are crucial to understanding the effects of land use regulations and policies, and this 
-landscape-scale analysis of riparian corridors statewide showed ongoing increases in the extent of impervious cover within these previously altered and ecohydrologically sensitive portions of watersheds.
+Cumulative assessments of land cover change are crucial to understanding the effects of land use policies, and this 
+statewide analysis showed increased impervious cover within the ecohydrologically sensitive riparian corridors of watersheds. These results highlight the ongoing risk of cover change and the importance of continued attention to regulatory implementation where preservation of ecological function and services is a policy goal (Riparian Taskforce 2024). Just as the hardening of circulatory and connective tissues harms individual health, recovering watershed health where imperviousness has become prevalent will require halting and reversing the analogous progression of "hydrosclerosis".
 
-However...
+This analysis illustrates key challenges that complicate assessments: defining the spatial boundaries of evaluation and detecting differences within these bounds. The evaluation extent problem involves both the choice of a hydrographic representation and the width to extend laterally in the definition of riparian management zones. 
 
- - clarify that HRCD offers retrospective look at what happened within riparian corridor that was not necessarily regulated as critical area Fish and Wildlife Habitat Conservation Areas FWHCA; main takeaway is that additional protection is warranted if controlling adverse effects of imperv is policy goal
+The depicted resolution of the drainage network on which buffers are constructed exerts a primary influence on outcomes. What is seen as a "water" controls what is understood to adjoin waters. The RDE-HRCD and StreamCat-NLCD estimates presented here both derive from hydrography (NHD and NHDPlus) that is missing extensive lengths of the smaller, sometimes intermittent or ephemeral channels that contribute significantly to water quantity and quality (Brinkerhoff et al 2024). This increases the likelihood of under-estimating the overall functional impacts on aquatic ecosystems of land use changes. In the United States, the accuracy and comprehensiveness of flowlines and other features at the inner edge of RMZs promises to improve greatly as the USGS 3DHP initiative transitions to hydrography generated from LiDAR elevation data. Moreover, the derivation of linear features that are inherently integrated with a high-resolution representation of the surrounding channel migration zone and valley forms creates opportunities to refine and enhance vegetation-based delineation with information on geomorphic constraints.
 
+Despite considerable research and debate, the question of "how wide" to make buffers has resisted answers other than "it depends", with the relevant factors including a combination of local biophysical conditions (subject to observation and measurement) and sociocultural values subject to dialogue and power relations (Wilhere and Quinn 2018, Chapman et al. 2020). The assessed corridors in this analysis do not represent any specific authority and, in many locations, extend beyond the riparian management zones subject to the strongest protections at the time. Accordingly, the new impervious cover shown in these results does not necessarily represent a widespread failure of the operative regulatory regime during the 2010s. However, these results do raise the question of how much of the additional impact would have been avoided, minimized, or mitigated had the jurisdictional extent corresponded to the assessed corridor. 
 
+Moreover, "upland" imperviousness outside of any corridor up to or beyond 100m contributes some additional impact on riparian and in-channel conditions. A 30m buffer is unlikely to have the same functional effect within a primarily forested catchment as it does when adjacent to land converted to industrial, residential, or agricultural uses. In conjunction with site-specific slopes and soils factors, the surrounding watershed context of empirical studies of riparian function-width relationships has inevitably shaped our understanding of buffer dimensions and configurations. The applicability of width-function decay curves likely warrants review as increasing upland imperviousness continues to alter flow paths away from saturation-excess and towards infiltration-excess dynamics. 
 
-We analyzed high resolution land cover change data within an ecologically-grounded riparian corridor to quantify the magnitude of new impervious area in Washington state. A statewide estimate of `r round(rde_swifd_sum$impv_inc_ha[4])`ha (`r round(rde_swifd_sum$impv_inc_ac[4])` acres) during 2011 to 2017 represented `r round(100*rde_swifd_sum$impv_reach_pct[4], 3)`% of the total assessed extent. This estimate might be viewed as both a small portion of the entire riparian corridor and a large new addition to a sensitive portion of watersheds already subject to extensive alteration.
+Regardless, this evidence of new impervious cover underscores the importance of the geographic scope of jurisdiction, even as the regulatory dimensions that define RMZs remain inconsistent, with a range of values stipulated in state laws and local critical area ordinances (Folkerts et al. 2020). This legal variation is compounded by heterogeneity in the realized on-the-ground conditions within any particular management domain (Swartz et al 2024). Within Washington, adoption of the 200-year Site Potential Tree Height standard in WDFW guidance is not compulsory, but it defines a science-based, consistent minimum footprint for riparian habitat conservation areas more likely to reduce ecological losses. Nonetheless, while the SPTH~200~ standard avoids prescribing a single critical area dimension, the necessary widths may be greater where upland surface alteration or other valley attributes have already impaired desired functions.
 
-Riparian buffer dimensions that define the jurisdictional extent of management regimes far from uniform, with a range of legally stipulated values in state regulations and local critical area ordinances (Folkerts et al. 2020). This legal variation is in addition to the heterogeneity in realized on-the-ground conditions within any particular management domain (Swartz et al 2024). The 200-year Site Potential Tree Height standard in WDFW guidance has policy influence as a formulation of best available science, but it does not necessarily determine the footprint of protected areas. 
+Beyond the definition of the corridor itself, further uncertainty in landscape scale assessment is also associated with the data used to determine changes, in this case, the residual error persisting in the high resolution change polygons and the land cover classifications. Given these uncertainties and the other methodological differences in the underlying datasets, it is perhaps somewhat surprising that the RDE-HRCD and StreamCat-NLCD approaches converge on an estimate of new impervious cover in the hundreds of hectares a year. This value raises questions about whether a project-specific "no net loss" standard can possibly have preserved function at a cumulative scale. If hundreds of acres of impervious cover are not being removed each year, what actions are being taken to offset the functional consequences of those that continue to be added? Moving forward, such questions are likely only adequately addressed through the expanded use and further refinement of high resolution data (i.e., 1m or less). Notwithstanding the similarity in statewide aggregate values, the 30m land cover data was unsuited to characterizing site-scale patterns, lacking the ability to capture the many areas of new impervious cover smaller than a single pixel. However, a high resolution baseline cover dataset does not exist at the large extent and for the longer temporal duration of the coarser spatial data, hindering stratification of changes by the "before" condition of land that became impervious. Future retrospective studies might explore the potential for data assimilation methods to downscale and re-classify older imagery from models trained on later high-resolution sources, while subsequent assessments may better distinguish among types of pre-impervious vegetation by incorporating newly available datasets that record the period after that examined here.
 
-The full riparian corridor examined in this analysis does not represent any specific authority, and it is broader than many current management zones. These results may therefore over-estimate new impervious cover relative to the highly varied mosaic of currently binding buffer distances. Regardless of legal circumstances, however, the assessed corridor has hydrologic and ecological significance to in-channel conditions, and the RDE RMZ tessellation is based on hydrography (NHD) that is missing extensive lengths of the smaller, sometimes intermittent or ephemeral channels that contribute significantly to water quantity and quality (Brinkerhoff et al 2024). These factors increase the likelihood that this analysis under-estimates the overall functional impacts to aquatic ecosystems. 
-
-In addition to the uncertainty in hydrography and site index values on which SPTH~200~ dimensions are based, some residual error persists in the high resolution change polygons despite their manual review. These sources combine to prevent a straightforward estimate of the full uncertainty in the presented values. However, convergence of the independent RDE-HRCD and StreamCat-NLCD approaches presented here, as well as the estimates developed by Lazarus (2023), lends confidence to an estimate in the hundreds of hectares a year. Even imposing an arbitrary 25% reduction still produces values on this order of magnitude. This raises questions about whether regulation and permitting subject to a project-specific "no net loss" standard can have achieved the preservation of function at a cumulative scale. If hundreds of acres of impervious cover are not being removed each year, what actions have offset those that are being added?
-
-Moreover, the addition of upland imperviousness outside of this or any other assessed corridor from 10m to 100m has some effect on riparian and in-channel conditions (e.g., a 30m "buffer" is unlikely to have the same function within a primarily forested catchment as it does as a distinct strip adjacent to converted land). Beyond site-specific slopes and soils, the surrounding watershed context for data collection and analysis has inevitably shaped our understanding of the functional dimensions that underlie buffer formulations. The applicability of distance-decay curves likely warrants review as increasing upland imperviousness continues to alter flow paths away from saturation-excess and towards infiltration-excess dynamics. While an SPTH standard allows for some flexibility to avoid prescribing a single critical area dimension, the basic concept may be invalidated where upland surface alteration has rendered even some simple multiple of SPTH (2x or 5x etc.) insufficient to perform all desired functions.
-
-This comparison indicates only general patterns in the configuration of land cover conversion, with various anthropogenic changes such as roads, warehouses, and other commercial spaces combined with those due to residential construction. Moreover, the summarization of changes within county boundary extents did not generate replicates suited to statistical contrast without additional longitudinal observations; as noted, these "counties" included multiple authorities, had varying hydrographic error, and are affected by distinct socio-ecological histories. Nonetheless, the variation among them in the relationships between area-normalized impervious increases, population, and housing suggests the potential for growth to come at different costs in terms of riparian condition and function (@fig-impv_inc_pop_change). Lambert et al. (2025), offered a related empirical demonstration of the alternative outcomes for habitat from policies shaping land use, showing that similar housing gains in western Washington census block groups were accompanied by substantially different amounts of tree canopy loss. Further study is needed to better disentangle the complex set of interacting factors that likely contributed to the range in riparian impervious increases accompanying similar population changes.
+This comparison indicates general patterns in the configuration of land cover conversion, with various anthropogenic changes such as roads, warehouses, and other commercial spaces combined with those due to residential construction. Future extensions of high-resolution datasets could better disentangle impervious increases related to different activities, thereby clarifying how comparable levels of population and housing growth may impose smaller or larger demands on riparian habitat conditions (Lambert et al. 2025). 
 
 
-## Next steps
+
+Summarizing changes within county boundary extents did not generate replicates, and the idiosyncrasies of multiple authorities, varying hydrographic error, and distinct socio-ecological histories warrant longitudinal statistical approaches that are not viable with a single time period.
+
+
 
 Lazarus (2023) considered a statewide extent, using the National Land Cover Dataset (NLCD) and Cropland Data Layer (CDL) to examine the relative prevalence of vegetation and impervious cover classes within alternative riparian buffer configurations on lands stratified by public and private ownership. This analysis sought to address a holistic set of shifts among multiple land uses across Washington's varied ecoregions, but an increase in impervious-type classes was broadly apparent, estimated to total more than 4,500 ha (>11,000 acres) in the SPTH~200~ buffer between 2001 and 2019 (see table 16, as the combination of all 4 NLCD 'developed' classes).  
 
 
-  - The premise that social, political, and economic values inform any answer to "how wide should a riparian buffer be" led to separation of the technical review and policy recommendations ([Wilhere and Quinn 2018](https://digitalrepository.unm.edu/nrj/vol58/iss2/13/), Chapman et al. 2020). 
+  - Fish and Wildlife Habitat Conservation Areas (FWHCA)
+  - more on SWIFD/Chinook?
+  - Stormwater, 6PPDQ (coho)
   - Among other legal and economic shifts, this period follows the initial passage of the GMA in 1990 and the federal endangered species listings of several salmon populations during the 1990s, and it offers a perspective on the outcomes of recent practices with relevance to ongoing land use policy debates.
 
 
-  - fluviosclerosis
-  
-  - more on SWIFD/Chinook?
-
-  - 3DHP RMZs from geomorphically informed SPTH~200~ 
-  
-  - Stormwater, 6PPDQ (coho)
-
-  - [task force recs](https://ofm.wa.gov/sites/default/files/public/publications/RiparianTaskforcePreliminaryRecommendationsMay2024.pdf)
-
-  - Add county level population change numbers? fit: urb_ac_rp100 ~ year + pop + housing
-  - capture that per-person increases decreasing even as abs continues to increase? or just use bookend pop numbers [now seeing this was done in Powell et al (fig 6, continuously) and Bartz et al (text, bookends)]
- 
-
-see sc_ripcorr_nlcd for initial lit notes
-
 Hepinstall-Cymerman, J., S. Coe, and L.R. Hutyra. 2013. Urban growth patterns and growth management boundaries in the central Puget Sound, Washington, 1986–2007. Urban Ecosystems 16:109–129.
-
-Kennedy, R.E., Z. Yang, J. Braaten, C. Copass, N. Antonova, C. Jordan, and P. Nelson. 2015. Attribution of disturbance change agent from Landsat time-series in support of habitat monitoring in the Puget Sound region, USA. Remote Sensing of Environment 166:271-285.
 
 [UW MS thesis]
 Nayak (2023) focused on the Cedar River-Lake Washington watershed, reporting a measurable increase in impervious surface area within 54 identified riparian zones, noting that 21st-century growth is more nuanced due to zoning policies, yet significant enough to influence water quality and hydrology.
@@ -1068,7 +1051,7 @@ https://www.ingentaconnect.com/contentone/asprs/pers/2023/00000089/00000009/art0
 
 # Conclusion
 
-Washington is a leader in careful land and water use management, striving to encourage vibrant human communities without compromising the natural systems that make them possible. Yet at a statewide scale, high resolution data indicate that hundreds of acres are still being converted to impervious surface each year within sensitive riparian corridors. Attention to this ongoing change will be critical to continued progress towards salmon recovery and other valued aspects of ecological integrity.
+Washington state is a leader in land and water stewardship, striving to encourage vibrant human communities without compromising the natural systems that make them possible. Yet at a statewide scale during the 2010s, a period following the passage of laws to guide land use towards less damaging practices, high resolution data indicate that hundreds of hectares of new impervious surface were added each year within sensitive riparian corridors. Attention to this ongoing change will be critical to continued progress towards salmon recovery and other valued aspects of ecological integrity.
 
 # Acknowledgements
 
@@ -1097,6 +1080,9 @@ and Management Implications. Habitat Program, Washington Department of Fish and 
 
 Rentz, R., A. Windrope, K. Folkerts, and J. Azerrad. 2020. Riparian Ecosystems, Volume 2: Management Recommendations.
 Habitat Program, Washington Department of Fish and Wildlife, Olympia. https://wdfw.wa.gov/publications/01988
+
+Riparian Taskforce. 2024. Final Report and Recommendations. Prepared by Plauché & Carr LLP.
+https://ofm.wa.gov/sites/default/files/public/publications/Riparian%20Taskforce%20Final%20Report%20and%20Recommendations.pdf
 
 WDFW. 2024. A new way of looking at Washington’s waterways. Medium. https://wdfw.medium.com/a-new-way-of-looking-at-washingtons-waterways-ad05d872c4ce 
 
