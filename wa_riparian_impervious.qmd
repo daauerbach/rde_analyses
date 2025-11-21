@@ -566,30 +566,26 @@ sf_cnty_rde_sc <- sf_cnty |>
 
 ```
 
-## Assessed riparian areas
+## Assessed areas
 
-Reach scale differences between the RDE-HRCD and StreamCat-NLCD datasets (@fig-corridors_sumner) produced landscape scale differences in the total extent of the assessed corridor, with the former encompassing a `r round(100*((3636186-2595580)/2595580))`% larger area (@tbl-overall). The pattern of variation in assessed area also differed between datasets when summarized within county boundaries (@fig-cnty_assess). In the medium-resolution NHDPlus, standardized terrain processing from 30m digital elevation data captures larger streams and rivers but omits some small channels. The fixed buffer dimension of the StreamCat 'rp100' corridor meant that corridor area was driven by the length of the channel network and, when aggregated within counties, primarily reflected drainage density and overall county size. In contrast, the ecoregional variation in SPTH~200yr~ values and the underlying cartographic heterogeneity in NHD flowlines combined to create sub-regional differences in the RDE tessellation extent that were not necessarily related to watershed topography. Nonetheless, the RDE assessed corridor was primarily comprised of the SPTH~200yr~ RMZ portion at the statewide extent (`r round(100*(3066006/3636186))`%) and within individual counties (@fig-rde_cnty_zones_stacked_cols).
+Reach scale differences between the RDE-HRCD and StreamCat-NLCD datasets (@fig-overlay) produced landscape scale differences in the total extent of the assessed area, with the 3.6mil hectares in the RDE domain encompassing approximately `r round(100*((3636186-2595580)/2595580))`% more than the 2.6mil of the StreamCat *rp100* boundary (@tbl-overall). The medium-resolution NHDPlus underlying StreamCat captures larger streams and rivers but omits some small channels due to the standardized terrain processing of 30m digital elevation data. Consequently, despite the wider 100m buffer in StreamCat, the SPTH~200yr~ widths in the RDE were buffered on the greater length of the more extensive NHD channel network. Variation in assessed area was also apparent when summarizing within county boundaries (@fig-cnty_assess_zones_ratio, A & B), where the StreamCat fixed buffer dimension meant that aggregate area primarily reflected drainage density and overall county size. In contrast, the underlying cartographic heterogeneity in NHD flowlines combined with the ecoregional variation in SPTH~200yr~ values to produce differences in the RDE tessellation extent among (and within) counties that were not necessarily related to watershed topography. These contrasts were evident in the assessed area as proportion of total county area (@fig-cnty_assess_zones_ratio, C), where the RDE tessellation had a larger magnitude of variation. Nonetheless, the RDE assessed area was primarily comprised of the SPTH~200yr~ RMZ portion at the statewide extent (`r round(100*(3066006/3636186))`%) and within individual counties (@fig-cnty_assess_zones_ratio, D).
 
 ## Change in impervious cover
 
-An estimated 947 (2341) and 437 (1080) hectares (acres) of new impervious and semi-pervious cover were added to the assessed riparian corridor during the 2011-2017 period of the RDE-HRCD dataset. Differencing the 2011 and 2016 values in the Streamcat-NLCD dataset, high and medium intensity urban cover (>80% and 50-80% impervious respectively) increased by approximately 365 (900) and 1152 (2846) hectares (acres) within the rp100 corridor. Combining these types per dataset, this corresponded to average annual increases of 231 (158+73) and 303 (73+230) ha/year (@tab-overall). 
+An estimated 947 and 437 hectares of new impervious and semi-pervious cover were added to the assessed extent during the 2011-2017 period of the RDE-HRCD dataset (2,341 and 1,080 acres respectively). Differencing the 2011 and 2016 values in the Streamcat-NLCD dataset, high and medium intensity urban cover (>80% and 50-80% impervious respectively) increased by approximately 365 and 1152 hectares within the rp100 corridor (900 and 2,846 acres). Combining these types per dataset, these changes corresponded to average annual increases of 231 (158+73) and 303 (73+230) ha/year (@tab-overall). 
 
-The largest increases were concentrated in previously urbanizing portions of the state. Absolute change was greatest in proximity to the large and rapidly growing metropolitan areas of Seattle, Tacoma, and Vancouver in western Washington (King, Pierce, Clark counties) and Spokane and the Tri-Cities in the east (@fig-impv_inc_ha_map). However, the NLCD-based estimates for the medium (and low) intensity classes were generally greater in the more arid eastern counties.
+The largest increases were concentrated in already urbanized portions of the state. Absolute change was greatest in proximity to the large and rapidly growing metropolitan areas of Seattle, Tacoma, and Vancouver in western Washington (within King, Pierce, and Clark County bounds) and Spokane and the Tri-Cities in eastern Washington (within Spokane, Yakima, and Benton County bounds, @fig-impv_inc_ha_pct_map_cols). However, despite the largest absolute increase within the King County extent, the changes within Pierce and Clark county extents both formed a larger proportion of the assessed area (@fig-impv_inc_ha_pct_map_cols), highlighting differences in the relative density of impervious increase. Similarly, although total increases were smaller within the Kitsap, Island, and Benton county boundaries, these changes made up relatively high proportions of the assessed area.
 
-Normalizing by the assessed riparian corridor extent within county boundaries highlighted differences in the relative density of impervious cover change (@fig-impv_inc_pct_reach). Despite the largest absolute aggregate increase within King county boundaries, the changes within Pierce and Clark county extents both formed a larger proportion of the assessed area. Conversely, though total increases were smaller within the Kitsap, Island, and Benton boundaries, these changes made up relatively high proportions of the riparian corridor.
+Reflecting the concentration of human population and existing urbanization in western Washington, the relative density of impervious increases recorded in the RDE-HRCD dataset was considerably higher in reaches associated with Chinook distribution compared to non-salmon reaches. Although the aggregated absolute change was similar (432 vs 445 ha), the total assessed area associated with Chinook was much smaller, with new impervious cover between 2011 and 2017 forming more than a tenth of a percent (@fig-swifd).
 
-Reflecting the concentration of human population and existing urbanization in western Washington, the relative density of impervious increases recorded in the RDE-HRCD dataset was considerably higher in reaches associated with Chinook distribution compared to non-salmon reaches, due to a similar total change area within a much smaller total assessed area (@fig-swifd).
-
-The size distribution of individual changes accounting for these landscape scale patterns in the RDE-HRCD dataset was characterized by a few, larger impervious increase areas and many smaller ones. 
-
-The median intersecting area of the `r nrow(rde_impv)` new impervious cover polygons within the RDE riparian corridor was `r round(median(rde_impv$impv_inc_ha),3)` ha or 240 m^2, considerably less than the 900 m^2^ area of a single 30m pixel. Indeed, `r 100*round(sum(rde_impv$impv_inc_ha < 0.09) / nrow(rde_impv), 3)`% (5984 of 7437) changes were below this threshold, and `r 100*round(sum(rde_impv$impv_inc_ha < 0.4) / nrow(rde_impv), 3)`% were less than 0.4ha (1 acre). This pattern was broadly consistent across portions of the state with more and less total increase. However, despite the preponderance of small changes, a substantial portion of the total change derived from a small set of large changes (@fig-impv_inc_size). For example, the 10 largest per-reach increases contributed `r round(filter(rde_impv, rank == 10)$cimp, 1)` ha of the `r round(max(rde_impv$cimp), 1)` total (i.e., `r 100*round(filter(rde_impv, rank == 10)$cimp / max(rde_impv$cimp), 3)`% of new impervious area came from this 0.134% of reaches). In addition, the floodplain zone composed a greater proportion of the full reach area in many of these largest individual increases (@fig-impv_inc_size). 
+The size distribution of individual changes accounting for these landscape scale patterns in the RDE-HRCD dataset was characterized by a few, large impervious increases and many smaller ones. The median intersecting area of the `r nrow(rde_impv) |> scales::number(big.mark = ",")` increased impervious polygons within the RDE assessed area was `r round(median(rde_impv$impv_inc_ha),3)` ha or 240 m^2, considerably less than the 900 square meters of a single 30m pixel. Indeed, `r 100*round(sum(rde_impv$impv_inc_ha < 0.09) / nrow(rde_impv), 3)`% (5,984 of 7,437) changes were smaller than 900m^2^, and `r 100*round(sum(rde_impv$impv_inc_ha < 0.4) / nrow(rde_impv), 3)`% were less than 0.4ha (1 acre). This pattern was broadly consistent across portions of the state with more and less total increase in imperviousness. However, despite the preponderance of small changes, a substantial portion of the total change derived from a small set of large changes (@fig-impv_inc_size). For example, the 10 largest per-reach increases contributed `r round(filter(rde_impv, rank == 10)$cimp, 1)` ha of the `r round(max(rde_impv$cimp), 1)` total (i.e., `r 100*round(filter(rde_impv, rank == 10)$cimp / max(rde_impv$cimp), 3)`% of new impervious area came from this 0.134% of reaches). In addition, the floodplain zone composed a greater proportion of the full reach area in many of these largest individual increases (@fig-impv_inc_size). 
 
 # Discussion
 
 Cumulative assessments of land cover change are crucial to understanding the effects of land use policies, and this 
 statewide analysis showed increased impervious cover within the ecologically sensitive riparian corridors of watersheds. The results highlight the ongoing threats to riverscapes and the need for continued attention to regulatory implementation where preservation of ecological function and services is a policy goal (Riparian Taskforce 2024). The hardening of circulatory and connective tissues harms individual health; recovering watershed health requires halting and reversing the analogous progression of "hydrosclerosis" where imperviousness has become prevalent.
 
-The RDE-HRCD and Streamcat-NLCD approaches both provided evidence that statewide riparian impervious cover increased annually by hundreds of hectares during the first years of the 2010s. This general agreement was somewhat unexpected, and the convergence in aggregate values does reflect different combinations of observation and processing error. However, an independent analysis by Lazarus (2023) also yielded estimates of a comparable order of magnitude, corroborating this basic trend. Lazarus (2023) extracted land cover from 2001-2019 NLCD within an alternative depiction of SPTH~200yr~ RMZs, based on similar methods to that developed for the RDE but excluding sovereign tribal lands and using slightly different underlying hydrography. A total increase of approximately 4,768ha of the high (947ha) and medium (3,821ha) intensity urban cover classes over this period gives an estimate of roughly 251ha/year on average. This analysis found that the total increase in western Washington (Water Resource Inventory Areas 1-30) was double that of the eastern portion of the state, congruent with the findings here (@fig-impv_inc_ha_map).
+The RDE-HRCD and Streamcat-NLCD approaches both provided evidence that statewide riparian impervious cover increased annually by hundreds of hectares during the first years of the 2010s. This general agreement was somewhat unexpected, and the convergence in aggregate values does reflect different combinations of observation and processing error. However, an independent analysis by Lazarus (2023) also yielded estimates of a comparable order of magnitude, corroborating this basic trend. Lazarus (2023) extracted land cover from 2001-2019 NLCD within an alternative depiction of SPTH~200yr~ RMZs, based on similar methods to that developed for the RDE but excluding sovereign tribal lands and using slightly different underlying hydrography. A total increase of approximately 4,768ha of the high (947ha) and medium (3,821ha) intensity urban cover classes over this period gives an estimate of roughly 251ha/year on average. This analysis found that the total increase in western Washington (Water Resource Inventory Areas 1-30) was double that of the eastern portion of the state, congruent with the findings here (@fig-impv_inc_ha_pct_map_cols).
 
 With multiple methods arriving at an estimate of hundreds of hectares a year of new impervious cover within riparian corridors, a relevant question is whether a per-project "no net loss" standard can possibly have preserved function at a cumulative scale. If hundreds of hectares of impervious cover are not being removed each year, what actions are being taken to offset the functional consequences of those that continue to be added?
 
@@ -750,8 +746,8 @@ tibble(
 
 ```
 
-```{r fig-corridors_sumner}
-#| label: fig-corridors_sumner
+```{r fig-overlay}
+#| label: fig-overlay
 #| fig-cap: "Example location at junction of White and Puyallup Rivers in Sumner, WA (Pierce Co.) depicting alternative riparian corridors and high resolution change detection (HRCD) areas. SPTH~200yr~ RMZ (light green), EOW (blue), and floodplain (dark green) extents. StreamCatRp100 100m buffer on medium resolution NHDPlus (purple). HRCD impervious increases (grey)."
 
 sf_aoi <- st_as_sf(st_as_sfc(
@@ -824,60 +820,26 @@ sf_aoi <- st_as_sf(st_as_sfc(
 
 sf_aoi_geo <- readRDS("fig_corridors.rds")
 
-ggplot() +
+{
+  ggplot() + 
+    geom_sf(data = sf_cnty, fill = NA) +
+    #geom_sf(data = sf_aoi, color = "red", fill = "red") +
+    geom_sf(data = st_centroid(sf_aoi), color = "blue", fill = "blue", size = 2) +
+    ggspatial::annotation_scale() +
+  theme(axis.text = element_blank())
+}+{
+  ggplot() +
   geom_sf(data = sf_aoi_geo$fld |> st_crop(sf_aoi) |> filter(Zone == "RMZ"), color = "green", fill = "green") +
   geom_sf(data = sf_aoi_geo$fld |> st_crop(sf_aoi) |> filter(Zone == "OMZ"), color = "#69A2E4" , fill = "#69A2E4") +
   geom_sf(data = sf_aoi_geo$fld |> st_crop(sf_aoi) |> filter(Zone == "Flood"), color = "darkgreen" , fill = "darkgreen") +
   geom_sf(data = sf_aoi_geo$flw_rp100 |> st_union() |> st_crop(sf_aoi), fill = NA, color = "purple", linewidth = 0.5, show.legend = F) +
   geom_sf(data = sf_aoi_geo$hrcd, fill = "grey40", color = "grey40", alpha = 0.6) +
-  ggspatial::annotation_scale()
+  ggspatial::annotation_scale() +
+  theme(axis.text = element_blank())
+} +
+  plot_layout(design = "A\nB") + plot_annotation(tag_levels = "A")
 
-#ggsave("f_corridor_overlay_sumner_withfld.png", bg = "white", width = 7, height = 10, dpi = 200)
-```
-
-```{r fig-cnty_assess, eval=FALSE}
-#| label: fig-cnty_assess
-#| fig-cap: "Total area of assessed riparian corridor by county geographic boundaries. A) The Riparian Data Engine statewide tessellation based on SPTH~200yr~ management zones, extent of observed water, and floodplain polygons. B) The StreamCat 100m riparian buffer on medium resolution NHDPlus."
-
-list(
-  #range(ha*rde_cnty_sum$reach_ac)
-  reach_ha = sf_cnty_rde_sc |>  
-    ggplot() + geom_sf(aes(fill = ha*reach_ac), show.legend = T) + 
-    scale_fill_gradient(name = "hectares", labels = scales::label_comma(),
-                        low = "#BEE7DF", high = "#212540", na.value = "pink",
-                        limits = c(0, 300000)) +
-    labs(subtitle = "A. RDE: RMZ+EOW+floodplain")
-  ,
-  rp100_ha = sf_cnty_rde_sc |> 
-    ggplot() + geom_sf(aes(fill = rp100_ha), show.legend = T) + 
-    scale_fill_gradient(name = "hectares", labels = scales::label_comma(),
-                        low = "#BEE7DF", high = "#212540", na.value = "pink", 
-                        limits = c(0, 300000)) +
-    labs(subtitle = "B. StreamCat: NHDplus rp100")
-) |> 
-  wrap_plots(design = "A\nB", guides = "collect")
-
-```
-
-```{r fig-rde_cnty_zones_stacked_cols, eval=FALSE}
-#| label: fig-rde_cnty_zones_stacked_cols
-#| fig-cap: "Relative proportions of riparian corridor elements in the RDE-HRCD dataset"
-
-#showing the relative/proportional composition of 'zones'
-rde_cnty_sum |>
-  mutate(
-cnty = factor(cnty) |> fct_reorder(reach_ac),
-across(c(rmz_ac, eow_ac, flood_ac), ~.*ha)
-) |>
-  select(cnty, RMZ = rmz_ac, EOW = eow_ac, Floodplain = flood_ac) |>
-  pivot_longer(-cnty) |>
-  #filter(name == "eow_ac") |> #Grant Co really does have numerous large lakes and reservoirs
-  ggplot() + geom_col(aes(value, cnty, fill = name)) +
-  scale_x_continuous(labels = scales::label_comma()) +
-  scale_fill_manual(name = "RDE zone", values = c("#69A2E4","darkgreen","green")) +
-  labs(x = "ha", y = NULL) +
-theme(legend.position = "bottom")
-
+#ggsave("f1_overlay.png", bg = "white", width = 7, height = 12, dpi = 200)
 ```
 
 ```{r fig-cnty_assess_zones_ratio}
@@ -892,7 +854,7 @@ d <- as_tibble(sf_cnty_rde_sc) |>
     across(
       c(rmz_ac, eow_ac, flood_ac), 
       ~(.*ha)/reach_ha
-      ),
+    ),
     cnty = factor(cnty) |> fct_reorder(reach_ha)
   )
 
@@ -914,6 +876,17 @@ list(
     labs(subtitle = "B. StreamCat: NHDplus rp100") +
     theme(axis.text = element_text(size = 3))
   ,
+    d |>
+    select(cnty, cnty_ha, rp100 = rp100_ha, RDE = reach_ha) |> arrange(cnty) |> 
+    pivot_longer(-c(cnty, cnty_ha)) |>
+    ggplot() + 
+    geom_col(aes(value/cnty_ha, cnty, fill = name), position = "dodge") +
+    scale_x_continuous(labels = scales::label_percent()) +
+    scale_fill_manual(name = NULL, values = c("#7E4837", "#483778")) +
+    labs(x = "assessed riparian / county extent", y = NULL,
+         subtitle = "C. Assessed area proportion of county extent") +
+    theme(legend.position = "bottom")
+,
   d |>
     select(cnty, reach = reach_ha, RMZ = rmz_ac, EOW = eow_ac, Floodplain = flood_ac) |>
     pivot_longer(-c(cnty, reach)) |>
@@ -922,9 +895,8 @@ list(
     scale_x_continuous(labels = scales::label_percent()) +
     scale_fill_manual(name = "RDE zone", values = c("#69A2E4","darkgreen","green")) +
     labs(x = NULL, y = NULL, 
-         subtitle = "C. RDE zone proportions") +
+         subtitle = "D. RDE zone proportions") +
     theme(legend.position = "bottom")
-  ,
   # d |>
   #   select(cnty, rp100_ha, reach_ha, rde_rp100) |> arrange(cnty) |> 
   #   ggplot() +
@@ -935,122 +907,11 @@ list(
   #   scale_x_continuous(limits = c(0, 4.5)) +
   #   labs(x = "RDE ha / rp100 ha", y = NULL,
   #        subtitle = "D. Assessed area ratio, RDE:rp100")
-  d |>
-    select(cnty, cnty_ha, rp100 = rp100_ha, RDE = reach_ha) |> arrange(cnty) |> 
-pivot_longer(-c(cnty, cnty_ha)) |>
-ggplot() + 
-geom_col(aes(value/cnty_ha, cnty, fill = name), position = "dodge") +
-scale_x_continuous(labels = scales::label_percent()) +
-scale_fill_manual(name = NULL, values = c("#7E4837", "#483778")) +
-labs(x = "assessed riparian / county extent", y = NULL,
-subtitle = "D. Assessed area proportion of county extent") +
-    theme(legend.position = "bottom")
-
+  
 ) |>
   wrap_plots(design = "AB\nCD", guides = "keep")
 
-```
-
-```{r fig-impv_inc_ha_map, eval=FALSE}
-#| label: fig-impv_inc_ha_map
-#| fig-cap: "Geographic distribution and magnitude of new impervious cover."
-
-d <- sf_cnty_rde_sc |> 
-  as_tibble() |> 
-  #select(cnty, impv_inc_ac, semi_inc_ac, `2011_urbhi`,`2011_urbmd`, `2016_urbhi`,`2016_urbmd`) |> 
-  mutate(
-    impv_ha = ha*(impv_inc_ac),
-    semi_ha = ha*(semi_inc_ac),
-    hi_ha = `2016_urbhi`-`2011_urbhi`, 
-    md_ha = `2016_urbmd`-`2011_urbmd`
-  ) |> 
-  select(cnty, ends_with("ha"), -rp100_ha) |>
-  slice_max(impv_ha, n = 10) |> 
-  pivot_longer(-cnty, values_to = "ha") |> 
-  mutate(
-    src = if_else(str_detect(name, "impv|semi"), "RDE-HRCD", "SC-NLCD") |> 
-      factor(levels = c("RDE-HRCD", "SC-NLCD"))
-    ,
-    name = paste0(src, "_", name)
-  )
-
-pal_d <- set_names(
-  c("#7E4837","#BAAF9F", "#483778", alpha("#483778",0.3)),
-  sort(unique(d$name))
-)
-
-{
-    sf_cnty_rde_sc |>
-      ggplot() + 
-      geom_sf(aes(fill = ha*(impv_inc_ac+semi_inc_ac)), color = "white", show.legend = T) +
-      geom_sf(data = sf_wa_city, color = "brown", show.legend = F) +
-      geom_sf_text(data = sf_wa_city, aes(label = name), color = "brown", hjust = 1.1, size = 3, show.legend = F) +
-      scale_fill_gradient(name = "ha", low = "grey95", high = pal_d["RDE-HRCD_impv_ha"]) + #, limits = c(0,300)
-      labs(x = NULL, y = NULL, subtitle = "RDE-HRCD imperv+semi 2011-2017") +
-      theme(axis.text = element_blank())
-  }+{
-    sf_cnty_rde_sc |>
-      ggplot() + 
-      geom_sf(aes(fill = (`2016_urbhi`+`2016_urbmd`) - (`2011_urbhi`+`2011_urbmd`)), color = "white", show.legend = T) +
-      geom_sf_text(data = sf_cnty |> semi_join(d, by = "cnty"), aes(label = cnty), color = "grey20", size = 3) +
-      geom_sf(data = sf_wa_city, color = "brown", show.legend = F) +
-      geom_sf_text(data = sf_wa_city, aes(label = name), color = "brown", hjust = 1.1, size = 3, show.legend = F) +
-      scale_fill_gradient(name = "ha", low = "grey95", high = pal_d["SC-NLCD_hi_ha"]) +
-      labs(x = NULL, y = NULL, subtitle = "SC-NLCD 'high'+'med' 2011-2016") +
-      theme(axis.text = element_blank())
-  }+{
-  d |> 
-    ggplot() +
-    geom_col(aes(ha, src, fill = name), show.legend = F) +
-    scale_y_discrete(limits = rev) +
-    scale_fill_manual(values = pal_d) +
-    facet_wrap(~cnty, strip.position = "right", ncol = 1) +
-    labs(y = NULL, subtitle = "County boundaries with largest\nHRCD impervious increases") +
-    theme(
-      axis.text.y = element_text(size = 5),
-      strip.text = element_text(size = 6))
-} +
-plot_layout(design = "AC\nBC") +
-plot_annotation(tag_levels = "A")
-
-```
-
-```{r fig-impv_inc_pct_reach, eval=FALSE}
-#| label: fig-impv_inc_pct_reach
-#| fig-cap: "New impervious cover as proportion of county geographic extent for RDE-HRCD (brown triangles) and StreamCat (purple dots) estimates."
-
-#somewhat redundant wrangling (% are equiv whether ac or ha and SC was orig in %)
-#but for clarity
-d <- full_join(
-  rde_cnty_sum |> 
-    mutate(
-      reach_ha = ha*reach_ac,
-      impv_ha = ha*impv_inc_ac,
-      impv_reach_pct = impv_ha / reach_ha
-    ) |> 
-    select(cnty, reach_ha, impv_ha, impv_reach_pct)
-  ,
-  sc_nlcd_year_cnty_sum |> 
-    mutate(
-      hi_ha = `2016_urbhi`-`2011_urbhi`, 
-      hi_rp100_pct = hi_ha / rp100_ha
-    ) |> 
-    select(cnty, rp100_ha, hi_ha, hi_rp100_pct)
-  ,
-  by = "cnty")
-
-
-d |> 
-  filter(impv_reach_pct > 0.0002) |> 
-  ggplot(aes(y = fct_reorder(cnty, impv_reach_pct))) +
-  geom_point(aes(impv_reach_pct, size = impv_ha), color = "#7E4837", fill = "#7E4837", shape = 17, show.legend = F) +
-  geom_point(aes(hi_rp100_pct, size = hi_ha), color = "#483778", show.legend = F) +
-  scale_x_continuous(labels = scales::label_percent()) +
-  scale_size_area(max_size = 5) +
-  labs(
-    x = "Percentage of assessed riparian corridor",
-    y = NULL) 
-
+#ggsave("f2_cnty_assess_zones_ratio.png", bg = "white", width = 10, height = 12, dpi = 200)
 ```
 
 ```{r fig-impv_inc_ha_pct_map_cols}
@@ -1076,7 +937,8 @@ d <- as_tibble(sf_cnty_rde_sc) |>
     hi_cnty_pct = hi_ha / cnty_ha
   ) |> 
   select(cnty, ends_with("ha"), ends_with("pct")) |>
-  slice_max(impv_ha, n = 10) |> 
+  #slice_max(impv_ha, n = 15) |> 
+  filter(str_detect(cnty, "Clark|King|Pierce|Benton|Kitsap|Island|Snoho|Spokane|Yakima")) |> 
   pivot_longer(c(ends_with("ha"), ends_with("pct"), -cnty_ha, -reach_ha, -rp100_ha)) |> 
   mutate(
     src = if_else(str_detect(name, "impv|semi|reach"), "RDE-HRCD", "SC-NLCD") |> 
@@ -1165,6 +1027,7 @@ geom_vline(xintercept = 0.0005, linetype = 2) +
 plot_layout(design = "ACDE\nBCDE") +
 plot_annotation(tag_levels = "A")
 
+#ggsave("f3_impv_inc_ha_pct_map_cols.png", bg = "white", width = 16, height = 7, dpi = 200)
 ```
 
 ```{r fig-swifd}
@@ -1206,6 +1069,7 @@ rde_swifd_sum |>
   #   labs(subtitle = "RDE reaches with SWIFD Chinook")
   # ,
 
+#ggsave("f4_swifd.png", bg = "white", width = 12, height = 8, dpi = 200)
 ```
 
 ```{r fig-impv_inc_size}
@@ -1255,6 +1119,7 @@ rde_impv |>
   plot_layout(heights = c(1/3,1/3,1/3)) + 
   plot_annotation( tag_levels = "A")
 
+#ggsave("f5_impv_inc_size.png", bg = "white", width = 9, height = 12, dpi = 200)
 ```
 
 
