@@ -1,5 +1,5 @@
 ---
-title: "Landscape assessment of high resolution change in riparian impervious cover"
+title: "High resolution, landscape scale assessment of riparian impervious cover change"
 date: "`r Sys.Date()`"
 format:
   docx: 
@@ -56,7 +56,7 @@ sf_wa_city <- maps::us.cities |>
 
 Daniel A Auerbach (dan.auerbach@dfw.wa.gov; ORCID: 0000-0002-3655-5206; corresponding author)
 
-Kenneth B Pierce, Ken Muir, Keith Folkerts, Robin Hale, Kara A Whittaker, Simone Des Roches 
+Kenneth B Pierce, Ken Muir, Keith Folkerts, Robin Hale, Kara A Whittaker, Simone Des Roches (ORCID 0000-0002-5360-8197)
 
 Habitat Program, Washington Department of Fish and Wildlife, Olympia, Washington, United States of America
 
@@ -70,7 +70,7 @@ Riparian, Land Cover, Impervious surface, Cumulative Assessment
 
 # Statements and Declarations
 
-The authors have no relevant financial or competing interests to disclose. **Funding for HRCD/RDE was provided by...**
+The authors have no relevant financial or competing interests to disclose. Funding for generation of High Resolution Change Detection and Riparian Data Engine was provided by the Washington State operating budget for fiscal years 2022-2024.
 
 # Abstract
 
@@ -981,7 +981,7 @@ rde_swifd_sum |>
 
 ```{r fig-impv_inc_size}
 #| label: fig-impv_inc_size
-#| fig-cap: "Characterization of per-reach impervious increase from high resolution change detection; a) Size distribution of individual per-reach increases in impervious cover (n = 7437, not showing 145 greater than 1 hectare); b) Cumulative increase by per-reach rank; c) Magnitude of impervious increase relative to the proportion of the floodplain type in the assessed reach area"
+#| fig-cap: "Characterization of per-reach impervious increase from high resolution change detection; a) Size distribution of individual per-reach increases in impervious cover (n = 7,437, not showing 145 greater than 1 hectare); b) Cumulative increase by per-reach rank; c) Magnitude of impervious increase relative to the proportion of the floodplain type in the assessed reach area"
 
 # rde_impv |>
 #   ggplot() +
@@ -1037,7 +1037,7 @@ The RDE-HRCD and Streamcat-NLCD approaches provided different lines of evidence 
 
 In addition, an independent analysis by Lazarus (2023) also yielded estimates at a comparable order of magnitude (@tbl-overall). Lazarus (2023) extracted land cover from 2001-2019 NLCD within an alternative depiction of SPTH~200yr~ RMZs, based on similar methods to that developed for the RDE, while excluding sovereign tribal lands and using slightly different underlying hydrography. The spatial distribution of total increase was congruent with the findings here, and a total increase of approximately 4,768 ha of the high (947 ha) and medium (3,821 ha) intensity urban cover classes over this period gives an estimate of roughly 251ha/year on average.
 
-This analysis illustrates key methodological choices that affect quantitative watershed-scale assessments: defining the spatial boundaries of evaluation and detecting differences within these bounds. The evaluation extent problem involves both the choice of a hydrographic representation and the width to extend laterally in the definition of riparian management zones, and the detection question in turn concerns the scale of change events. 
+This analysis illustrates key methodological choices that affect quantitative watershed-scale assessments of riparian cover condition: defining the spatial boundaries of evaluation and detecting differences within these bounds. The evaluation extent problem involves both the choice of a hydrographic representation and the lateral width of the riparian management zone, and the detection question concerns the scale of change events. 
 
 The resolution of the drainage network on which buffers are constructed exerts a primary influence on estimates of land cover change. What is seen as a stream controls what is understood to be riparian and adjacent to water. The RDE-HRCD and StreamCat-NLCD estimates presented here both derive from hydrographic datasets (NHD and NHDPlus) that omit extensive lengths of the smaller, sometimes intermittent or ephemeral channels that contribute significantly to water quantity and quality (Brinkerhoff et al 2024). Drainage network coarseness increases the likelihood of under-estimating the overall functional impacts on aquatic ecosystems of land use changes. Future assessments will benefit from the greatly improved accuracy and comprehensiveness of flowlines and channels based on hydrography generated from LiDAR elevation data (i.e., the USGS 3DHP initiative; https://www.usgs.gov/3d-hydrography-program). Moreover, the derivation of linear features that are inherently integrated with a high-resolution representation of the surrounding channel migration zone and valley form creates opportunities to refine and enhance vegetation-based RMZ delineation with information on geomorphic constraints.
 
@@ -1047,9 +1047,11 @@ The ecological risks from a narrow RMZ are heightened by the fact that "upland" 
 
 Regardless, this evidence of new impervious cover underscores the importance of the regulatory dimensions that define RMZs, which are often undefined or inconsistent, with a range of values stipulated in state forestry regulation (WAC 222-30) and various local critical area ordinances (Folkerts et al. 2020). This regulatory variation is compounded by heterogeneity in the realized on-the-ground conditions within any particular management domain (Swartz et al 2024). Within Washington, adoption of the SPTH~200yr~ standard in WDFW guidance is not compulsory, but it defines a science-based, consistent minimum footprint that is more likely to reduce ecological losses. The SPTH~200yr~ standard provides a site-specific RMZ width, which may need to be wider given site-specific upland surface alteration or other watershed attributes have already impaired desired functions.
 
-Beyond definition of the riparian extent, further uncertainty in landscape scale assessment is associated with the data used to determine land cover change. As described earlier, some residual error unavoidably persists in the high resolution change polygons and the land cover classifications despite the extensive validation and quality control efforts in both datasets. Yet this analysis suggests how future assessments are likely best addressed through the expanded use and further refinement of data at 1m or less resolution. The 30m land cover data was less suited to characterizing reach and site scale patterns, lacking the ability to capture the many areas of new impervious cover smaller than a single pixel. However, a high resolution dataset of baseline land cover does not exist at the large extent and for the longer temporal duration of the coarser spatial data, hindering characterization of the observed changes according to the "before" condition of land that became impervious. Future retrospective studies might explore the potential for data assimilation methods to downscale and re-classify older imagery from models trained on later high-resolution sources, while subsequent assessments may better distinguish among types of pre-impervious vegetation by incorporating newly available data that records time periods after that examined here.
+Beyond definition of the riparian extent, further uncertainty in landscape scale assessment is associated with the data used to determine land cover change. As described earlier, some residual error unavoidably persists in the high resolution change polygons and the land cover classifications despite the extensive validation and quality control efforts in both datasets. In particular, this analysis does not account for cases of partial intersections of RDE reach polygons with HRCD polygons that include less than complete impervious change. Such instances would tend to bias the aggregate estimates higher if the actual new impervious cover within the HRCD polygon occurred outside the area of intersection. However, this was unlikely to have qualitatively affected results due to the prevalence of very small change areas that were fully encompassed or had little potential for within-polygon displacement outside of a partial intersection. 
 
-This comparison indicates general patterns in recent land cover conversion, with various anthropogenic changes such as roads, warehouses, and other commercial spaces combined with those due to residential construction. Future extensions of high-resolution datasets could better disentangle impervious increases related to different activities, thereby clarifying how comparable amounts of population and housing growth may impose smaller or larger demands on riparian habitat conditions (Lambert et al. 2025). 
+Such considerations underscore how future assessments are best addressed through the expanded use and further refinement of data at 1m or less resolution. The 30m land cover data was less suited to characterizing reach and site scale patterns, lacking the ability to capture the many areas of new impervious cover smaller than a single pixel. However, a high resolution dataset of 2011 baseline land cover does not exist at the large extent and longer temporal duration of the coarser spatial data, hindering characterization of the observed changes according to the "before" condition of land that became impervious. Future retrospective studies might explore the potential for data assimilation methods to downscale and re-classify older imagery from models trained on later high-resolution sources, while subsequent assessments may better distinguish among types of pre-impervious vegetation by incorporating newly available data that records time periods after that examined here.
+
+This comparison indicates general patterns in recent land cover conversion, with various anthropogenic changes such as roads, warehouses, and other commercial spaces combined with those due to residential construction. Future extensions of high-resolution datasets could also better disentangle impervious increases related to different activities, thereby clarifying how comparable amounts of population and housing growth may impose smaller or larger demands on riparian habitat conditions (Lambert et al. 2025). 
 
 # Conclusion
 
@@ -1057,16 +1059,17 @@ Washington State is a leader in land and water stewardship, striving to encourag
 
 # Acknowledgements
 
-Earlier versions of the manuscript were much improved thanks to comments by George Wilhere, Maddie Nolan, Reed Ojala-Barbour, and Braeden Van Deynze. We thank the team at ESA for their help preparing datasets and building the Riparian Data Engine web application, and we appreciate the ongoing development of the StreamCat data and associated tools.
-
+The authors wish to thank Colin Struthers, Ray Lee, Mike Leech, Kathleen Elmquist and the rest of the team at ESA for their dedication and efforts in building the Riparian Data Engine web application. We also appreciate the work of Mark Weber and others in the ongoing maintenance and development of the StreamCat data and associated tools. Earlier versions of the manuscript were much improved thanks to comments by George Wilhere, Maddie Nolan, Reed Ojala-Barbour, and Braeden Van Deynze.
 
 # Citations
 
 Bartz, K.K., Ford, M.J., Beechie, T.J., Fresh, K.L., Pess, G.R., Kennedy, R.E., Rowse, M.L. and Sheer, M., 2015. Trends in developed land cover adjacent to habitat for threatened salmon in Puget Sound, Washington, USA. PLoS One, 10(4), p.e0124415.
 
-Chapman, M., Satterfield, T., & Chan, K. M. A. 2020. How value conflicts infected the science of riparian restoration for endangered salmon habitat in America’s Pacific Northwest: Lessons for the application of conservation science to policy. Biological Conservation, 244, 108508. https://doi.org/10.1016/j.biocon.2020.108508
+Chapman, M., Satterfield, T., and Chan, K. M. A. 2020. How value conflicts infected the science of riparian restoration for endangered salmon habitat in America’s Pacific Northwest: Lessons for the application of conservation science to policy. Biological Conservation, 244, 108508. https://doi.org/10.1016/j.biocon.2020.108508
 
 Fausch, K.D., Torgersen, C.E., Baxter, C.V. and Li, H.W., 2002. Landscapes to riverscapes: bridging the gap between research and conservation of stream fishes: a continuous view of the river is needed to understand how processes interacting among scales set the context for stream fishes and their habitat. BioScience, 52(6), pp.483-498.
+
+Folkerts, K., Johnson, T., and Bouchillon, R., 2020. Final Report: Evaluating Critical Area Ordinance Effectiveness: Mapping Critical Areas. https://www.ezview.wa.gov/Portals/_1992/Documents/2021workshops/Webinar%2010%20-%20Final%20Report%20NTA%200368.pdf
 
 Folkerts K, K. Muir, J. Michalak. 2025. PHS Local Government User Guide: 2025 Riparian Management Zones Map. Habitat Program, Washington Department of Fish and Wildlife, Olympia.
 
@@ -1076,7 +1079,11 @@ Graziano, M.P., Deguire, A.K. and Surasinghe, T.D., 2022. Riparian buffers as a 
 
 Hill, Ryan A., Marc H. Weber, Scott G. Leibowitz, Anthony R. Olsen, and Darren J. Thornbrugh, 2016. The Stream-Catchment (StreamCat) Dataset: A Database of Watershed Metrics for the Conterminous United States. Journal of the American Water Resources Association (JAWRA) 52:120-128. DOI: 10.1111/1752-1688.12372.
 
+Jones, K.B., Slonecker, E.T., Nash, M.S., Neale, A.C., Wade, T.G. and Hamann, S., 2010. Riparian habitat changes across the continental United States (1972–2003) and potential implications for sustaining ecosystem services. Landscape Ecology, 25(8), pp.1261-1275.
+
 Knutson, K. L., and Naef, V. L. 1997. Management recommendations for Washington’s priority habitats: Riparian (p. 181pp.). Washington Department of Fish and Wildlife. https://wdfw.wa.gov/sites/default/files/publications/00029/wdfw00029.pdf
+
+Lambert, M.R., Des Roches, S., Auerbach, D.A., Van Deynze, B., Behrens, S., Hale, R. and Pierce, K.B., 2025. Building the neighborhood for the trees: Illuminating win–wins for housing densification and nature. Conservation Science and Practice, 7(7), p.e70085.
 
 Lazarus, D., 2023. Current Status of Riparian Buffers in Washington State: Public and Private Land Cover Within Riparian Management Zones Based on Best Practice Guidelines (MES thesis, Evergreen State College).
 
@@ -1090,6 +1097,8 @@ Pierce Jr, K.B., 2015. Accuracy optimization for high resolution object-based ch
 
 Poff, B., Koestner, K.A., Neary, D.G. and Henderson, V., 2011. Threats to riparian ecosystems in Western North America: an analysis of existing literature 1. JAWRA Journal of the American Water Resources Association, 47(6), pp.1241-1254.
 
+Powell, S.L., Cohen, W.B., Yang, Z., Pierce, J.D. and Alberti, M., 2008. Quantification of impervious surface in the Snohomish water resources inventory area of western Washington from 1972–2006. Remote Sensing of Environment, 112(4), pp.1895-1908.
+
 Quinn, T., G.F. Wilhere, and K.L. Krueger, technical editors. 2020. Riparian Ecosystems, Volume 1: Science Synthesis and Management Implications. Habitat Program, Washington Department of Fish and Wildlife, Olympia. https://wdfw.wa.gov/publications/01987
 
 Rentz, R., A. Windrope, K. Folkerts, and J. Azerrad. 2020. Riparian Ecosystems, Volume 2: Management Recommendations. Habitat Program, Washington Department of Fish and Wildlife, Olympia. https://wdfw.wa.gov/publications/01988
@@ -1097,6 +1106,8 @@ Rentz, R., A. Windrope, K. Folkerts, and J. Azerrad. 2020. Riparian Ecosystems, 
 Riparian Taskforce. 2024. Final Report and Recommendations. Prepared by Plauché & Carr LLP. https://ofm.wa.gov/sites/default/files/public/publications/Riparian%20Taskforce%20Final%20Report%20and%20Recommendations.pdf
 
 Schueler, T.R., Fraley-McNeal, L. and Cappiella, K., 2009. Is impervious cover still important? Review of recent research. Journal of Hydrologic Engineering, 14(4), pp.309-315.
+
+Swartz, A.G., Coble, A.A., Thaler, E.A. and Warren, D.R., 2024. Quantifying the Variability of “Fixed-Width” Buffers on Harvested Lands in Western Oregon and Washington. Journal of Forestry, 122(5-6), pp.417-430.
 
 WDFW. 2024. A new way of looking at Washington’s waterways. Medium. https://wdfw.medium.com/a-new-way-of-looking-at-washingtons-waterways-ad05d872c4ce 
 
@@ -1141,7 +1152,15 @@ sf_hrcd_11_17 <- sf_hrcd |>
    between(EndYr, 2013, 2017),
    (ImpIncAc > 0 | SemiIncAc > 0),
    CngOrigin == "Anthropogenic"
-   ) 
+   )
+
+as_tibble(sf_hrcd_11_17) |> 
+  # mutate(across(c(ImpIncPct, SemiIncPct), ~as.character(round(., digits = 2)))) |> 
+  # #count(ImpIncPct, SemiIncPct) |> 
+  # count(ImpIncPct) |> 
+  mutate(p = as.character(round(ImpIncPct + SemiIncPct, digits = 2))) |> count(p) |> 
+  arrange(desc(n))
+
 #want this? sf_hrcd_11_17_semionly <- sf_hrcd_11_17 |> filter(ImpIncAc == 0)
 #as_tibble(sf_hrcd_11_17) |> count(StartYr, EndYr)
 #as_tibble(sf_hrcd_11_17) |> count(CngOrigin, CngAgentNm)
