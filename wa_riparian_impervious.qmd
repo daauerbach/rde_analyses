@@ -368,9 +368,7 @@ Analysts used custom software to examine this "unlikely" sample and the set of a
 
 ## StreamCat-processed National Land Cover Dataset
 
-As a complement and contrast to the RDE-HRCD dataset, the [`StreamCatTools`](https://github.com/USEPA/StreamCatTools) (Weber 2025) R package was used to access the [StreamCat dataset](https://www.epa.gov/national-aquatic-resource-surveys/streamcat-dataset) (Hill et al. 2016). This delivers consistently geoprocessed attribute values for each reach unit of the original medium resolution NHDPlus. Derived from a 30m DEM and sometimes termed "1:100K", this hydrography captures most substantial watercourses and is the precursor to subsequent higher-resolution, continent-wide elevation derived hydrographic datasets that include many smaller channel units (i.e., NHDPlusHR from 10m DEM and 3DHP from LiDAR). For each reach 'comid', StreamCat provides attribute values from many other data sources processed within the local contributing catchment ('`cat`') as well as a 100m riparian buffer ('`rp100`') on "stream lines and on-network NLCD water pixels". 
-
-StreamCat includes values calculated from 8 cycles of the National Land Cover Dataset (NLCD; 2001, 2004, 2006, 2008, 2011, 2013, 2016, and 2019), which are based on classification of satellite and other imagery sources [(Wickham et al. 2023)](https://www.tandfonline.com/doi/full/10.1080/15481603.2023.2181143). The StreamCat NLCD values represent the percentages of each of 16 land cover classes within each of the *cat* and *catrp100* areas of interest, such that approximate areas per-class were back-calculated against the per-comid area. The StreamCat process and NLCD datasets have undergone thorough QAQC and been extensively reviewed since their initial development, resulting in their widespread use in various scientific studies. Though unsuited to investigating site specific processes, these data are a standardized, consistent means to investigate large-scale patterns.
+As a complement and contrast to the RDE-HRCD dataset, the [`StreamCatTools`](https://github.com/USEPA/StreamCatTools) (Weber 2025) R package was used to access the [StreamCat dataset](https://www.epa.gov/national-aquatic-resource-surveys/streamcat-dataset) (Hill et al. 2016). StreamCat delivers consistently geoprocessed attribute values for each reach unit of the medium resolution NHDPlus. This hydrography captures most substantial watercourses and is the precursor to subsequent higher-resolution, continent-wide elevation-derived hydrographic datasets that include many smaller channel units (i.e., NHDPlusHR associated with 10m digital elevation raster and 3DHP derived from LiDAR). For each reach 'comid', StreamCat provides attribute values calculated from many national datasets processed within the local contributing catchment ('`cat`') as well as a 100m riparian buffer ('`rp100`') on "stream lines and on-network NLCD water pixels". This includes values calculated from 8 cycles of the National Land Cover Dataset (NLCD; 2001, 2004, 2006, 2008, 2011, 2013, 2016, and 2019), which are based on classification of satellite and other imagery sources [(Wickham et al. 2023)](https://www.tandfonline.com/doi/full/10.1080/15481603.2023.2181143). The StreamCat NLCD values represent the percentages of each of 16 land cover classes within each of the *cat* and *catrp100* areas of interest, such that approximate areas per-class were back-calculated against the per-comid area. The StreamCat process and NLCD datasets have undergone thorough QAQC and been extensively reviewed since their initial development, and they are an established, standardized means to investigate large-scale patterns.
 
 # Results
 
@@ -1029,11 +1027,42 @@ rde_impv |>
 #ggsave("f5_impv_inc_size.png", bg = "white", width = 9, height = 12, dpi = 200)
 ```
 
+```{r tbl_uncertainty}
+
+tribble(
+  ~Type, ~Concern, ~Dataset, ~Effect, ~Solution,
+  
+  "Hydrography", "Missing small watercourses", "both, primarily StreamCat-NLCD", "estimates low", "LiDAR derived watercourses",
+  "Hydrography", "Inconsistent drainage density representation", "both, primarily RDE-HRCD", "hinders comparison of sub-areas within assessed extent", "LiDAR derived watercourses",
+  "Hydrography", "Error in watercourse location", "both", "inaccurate channel edge propagates spatial misalignment of RMZs and land cover polygons/cells", "LiDAR derived watercourses",
+
+  "Riparian dimension", "Fixed width", "StreamCat-NLCD", "estimates high at small channels/drainage-areas and low at large channels/DA", "variable buffer width as a function of geomorphic setting (drainage area, reach slope, channel and valley constraints) and ecological controls (soils, stand composition)",
+  "Riparian dimension", "Missing data in SPTH~200yr~ RMZ creation", "RDE-HRCD", "estimates low due where default 100ft buffer width applied", "spatial interpolation of soils/site index values",
+  "Riparian dimension", "Aggregation of SPTH~200yr~ RMZwith floodplain polygons", "RDE-HRCD", "estimates high where assesed extent could be considered non-riparian", "stricter limit to narrower area",
+  "Riparian dimension", "Error in SPTH~200yr~ values", "RDE-HRCD", "estimates low/high due to narrow/wide RMZ resulting from mis-specified site index, tree species, and/or projected growth", "revise assignment of values to simpler ecoregional tiers combining vegetation height with geomorphic setting",
+  "Riparian dimension", "Enclusion of 'non-riparian' area", "both", "estimates high due to floodplain or  assessed area narrow/wide RMZ resulting from mis-specified site index, tree species, and/or projected growth", "",
+  
+  "Land cover", "Imprecision of HRCD change category assignment", "RDE-HRCD", "estimates high where actual change less than 25/50/75/100% upper category limit", "seek additional high resolution land cover data",
+  "Land cover", "Inaccuracy of NLCD category assignment", "StreamCat-NLCD", "estimates low/high where actual change greater/less than per-cell category limits", "calculate alternative realizations according to categorical proportions",
+  "Land cover", "Intersection misalignment", "RDE-HRCD", "estimates high where change areas within HRCD polygons fall outside of RMZ intersection", "seek additional high resolution land cover data"
+) |>
+  gt::gt(
+    caption = "Sources of uncertainty and likely effect on estimate bias",
+    groupname_col = "type", row_group_as_column = T
+    ) |>
+  gt::tab_style(style = cell_text(weight = "bold"), locations = cells_column_labels()) |>
+  gt::tab_style(style = cell_text(weight = "bold"), locations = cells_column_labels()) |>
+  gt::fmt_markdown() |> gt::gtsave(filename = "t2_uncertainty.png")
+
+```
+
+![](t2_uncertainty.png)
+
 # Discussion
 
 Assessment of land cover change at the scale of whole watersheds is crucial to understanding the effects of land use policies, and this statewide analysis showed increased impervious cover within ecologically sensitive riparian areas. The results highlight the ongoing threats to aquatic systems from watershed alteration and the need for continued attention to riparian regulations and their implementation where "no net loss of ecological function and services" is a policy goal and statutory requirement (Riparian Taskforce 2024). The hardening of blood vessels harms human health; recovering watershed health requires halting and reversing the analogous progression of "hydrosclerosis" whereby surface hardening hinders the free flux of matter and energy across land-water boundaries.
 
-The RDE-HRCD and Streamcat-NLCD approaches provided different lines of evidence that statewide riparian impervious cover increased annually by hundreds of hectares during the first years of the 2010s. Each dataset has a distinct combination of observation and processing error, and the approximate convergence in the values of aggregate total estimates may be coincidental to some degree. However, the greatest dataset differences in stream length and assessed extent were related to smaller, often headwater reaches, and the upper portions of many stream networks in Washington are steeper, forested, and less prone to urban land uses. Larger, lower, mainstem reaches tended to have more hydrographic agreement, reducing differences in assessed extents where human alteration of land cover tends to be more prevalent.
+The RDE-HRCD and Streamcat-NLCD approaches provided different lines of evidence that statewide riparian impervious cover increased annually by hundreds of hectares during the first years of the 2010s. Each dataset has a distinct combination of observation and processing error, and the approximate convergence in the values of aggregate total estimates may be coincidental. However, the greatest dataset differences in stream length and assessed extent were related to smaller, often headwater reaches, and the upper portions of many stream networks in Washington are steeper, forested, and less prone to urban land uses. Larger, lower, mainstem reaches tended to have more hydrographic agreement, reducing differences in assessed extents where human alteration of land cover tends to be more prevalent.
 
 In addition, an independent analysis by Lazarus (2023) also yielded estimates at a comparable order of magnitude (@tbl-overall). Lazarus (2023) extracted land cover from 2001-2019 NLCD within an alternative depiction of SPTH~200yr~ RMZs, based on similar methods to that developed for the RDE, while excluding sovereign tribal lands and using slightly different underlying hydrography. The spatial distribution of total increase was congruent with the findings here, and a total increase of approximately 4,768 ha of the high (947 ha) and medium (3,821 ha) intensity urban cover classes over this period gives an estimate of roughly 251ha/year on average.
 
@@ -1041,7 +1070,7 @@ This analysis illustrates key methodological choices that affect quantitative wa
 
 The resolution of the drainage network on which buffers are constructed exerts a primary influence on estimates of land cover change. What is seen as a stream controls what is understood to be riparian and adjacent to water. The RDE-HRCD and StreamCat-NLCD estimates presented here both derive from hydrographic datasets (NHD and NHDPlus) that omit extensive lengths of the smaller, sometimes intermittent or ephemeral channels that contribute significantly to water quantity and quality (Brinkerhoff et al 2024). Drainage network coarseness increases the likelihood of under-estimating the overall functional impacts on aquatic ecosystems of land use changes. Future assessments will benefit from the greatly improved accuracy and comprehensiveness of flowlines and channels based on hydrography generated from LiDAR elevation data (i.e., the USGS 3DHP initiative; https://www.usgs.gov/3d-hydrography-program). Moreover, the derivation of linear features that are inherently integrated with a high-resolution representation of the surrounding channel migration zone and valley form creates opportunities to refine and enhance vegetation-based RMZ delineation with information on geomorphic constraints.
 
-Along with the issue of determining "where is the water", the question of "how wide" to make buffers has received considerable research and debate, with the relevant factors including a combination of measurable biophysical conditions and sociocultural values subject to dialogue and power relations (Wilhere and Quinn 2018, Chapman et al. 2020). The assessed corridors in this analysis do not represent any specific authority and, in many locations, extend beyond the riparian management zones subject to regulatory protections during the assessed time window. Accordingly, the new impervious cover shown in these results does not necessarily represent inadequate implementation of the operative regulatory regime. However, these results do raise the question of how much of the additional impact would have been avoided, minimized, or mitigated had the extent of regulatory protections corresponded to this assessed area. Moreover, with alternative approaches arriving at estimates of hundreds of hectares a year of new impervious cover within riparian and adjacent areas, a relevant question is how per-project "no net loss" determinations can suffice to preserve ecological function at a whole-network scale. If hundreds of hectares of impervious cover are not being removed each year, are the mitigation actions that follow avoidance and minimization of impact adequate to offset the functional consequences of those that continue to be added?
+Along with the issue of determining "where is the water", the question of "how wide" to make buffers has received considerable research and debate, with the relevant factors including a combination of measurable biophysical conditions and sociocultural values subject to dialogue and power relations (Wilhere and Quinn 2018, Chapman et al. 2020). The assessed corridors in this analysis do not represent any specific authority and, in many locations, extend beyond the riparian management zones subject to regulatory protections during the assessed time window. Accordingly, the new impervious cover shown in these results does not necessarily represent inadequate implementation of the operative regulatory regime. However, these results do raise the question of how much of the additional impact would have been avoided, minimized, or mitigated had the extent of regulatory protections corresponded to these assessed areas (i.e., the composite of SPTH~200yr~ and default 100ft RMZs in the RDE dataset and the 100m buffers in the StreamCat dataset). Moreover, with alternative approaches arriving at estimates of hundreds of hectares a year of new impervious cover within riparian and adjacent areas, a relevant question is how per-project "no net loss" determinations can suffice to preserve ecological function at a whole-network scale. If hundreds of hectares of impervious cover are not being removed each year, are the mitigation actions that follow avoidance and minimization of impact adequate to offset the functional consequences of those that continue to be added?
 
 The ecological risks from a narrow RMZ are heightened by the fact that "upland" imperviousness outside of any corridor up to or beyond 100m contributes some additional impact on riparian and in-channel conditions. A 30m buffer is unlikely to have the same functional effect within a primarily forested catchment as it does when adjacent to land converted to industrial, residential, or agricultural uses. The applicability of buffer width- ecological function decay curves likely warrants review as increasing upland imperviousness continues to alter flow paths and the resulting riparian zone effects on water quantity and quality (e.g., more rapid overland flow due to shifts from saturation-excess to infiltration-excess dynamics). 
 
@@ -1055,7 +1084,7 @@ This comparison indicates general patterns in recent land cover conversion, with
 
 # Conclusion
 
-Washington State is a leader in land and water stewardship, striving to encourage vibrant human communities without compromising the natural systems that help make them vibrant. Yet, at a statewide scale during the 2010s, high resolution data indicate that hundreds of hectares of new impervious surface were added each year within sensitive riparian corridors. Attention to this ongoing change will be critical to continued progress towards salmon recovery and other valued aspects of ecological integrity within the framework of Washington's land use laws.
+Washington State laws seek to steward land and water, striving to encourage vibrant human communities without compromising the natural systems that sustain them. Yet, at a statewide scale during the 2010s, high resolution data indicate that hundreds of hectares of new impervious surface were added each year within areas near streams and rivers. Attention to this ongoing change will be critical to continued progress towards salmon recovery and other valued aspects of ecological integrity within the legal framework of Washington's land use.
 
 # Acknowledgements
 
@@ -1122,6 +1151,274 @@ Wilhere G and Quinn T. 2018. How Wide is Wide Enough?: Science, Values, and Law 
 # Tables and Figures
 
 # Supplementary info
+
+```{r ccap_1m_testing}
+# terra::rast("~/T/DFW-Team WDFW Watershed Synthesis - data_common/ccap/2021_CCAP/2021_CCAP_J1231012tR0_C0.tif") #30m
+
+#https://storymaps.arcgis.com/stories/f22c0fe823974d61b7db4c19f616c250
+#from: https://coastalimagery.blob.core.windows.net/ccap-landcover/CCAP_bulk_download/High_Resolution_Land_Cover/Phase_1_Initial_Layers/Impervious/index.html
+ccap_imp <- terra::rast("~/T/DFW-Team WDFW Watershed Synthesis - data_common/ccap/wa_2021_ccap_v2_hires_impervious_20250407/wa_2021_ccap_v2_hires_impervious_20250407.tif")
+
+#only RMZ and EOW but no attribute of SPTH200 value
+sf_rde_10 <- st_read("wdfw_rde_spth200_tess_wria_10.gpkg") |> #26.5k polys by PID
+  st_transform(st_crs(ccap_imp))
+
+#killed after too long: #rde_10_ccap <- terra::extract(ccap_imp, sf_rde_10, fun = table)
+#not seeing anything too new: https://r.geocompx.org/raster-vector
+#perhaps faster to rasterize RDE/tess?
+
+library(exactextractr)
+
+# exact_extract(ccap_imp, sf_rde_10[1:10,], fun = c("frac"))
+# exact_extract(ccap_imp, sf_rde_10[1:10,], fun = c("sum","count")) |> mutate(frac = sum/count)
+
+#considerably smaller
+ccap_imp_crop <- terra::crop(ccap_imp, sf_rde_10)
+#still slow but tolerable (~2min) and with progress bar at least
+system.time(
+rde_10_ccap <- exact_extract(ccap_imp_crop, sf_rde_10, fun = c("sum","count"), append_cols = c("pid","zone"))
+)
+
+rde_10_ccap |> 
+  #semi_join(filter(rde_cnty, wria == "10"), by = "pid") |> 
+  semi_join(rde_cnty, by = "pid") |> 
+  mutate(
+    tot_ha = count * 0.0001,
+    imp_ha = sum * 0.0001,
+    imp_pct = imp_ha/tot_ha #sum/count
+    ) |> 
+  summarise(
+    across(ends_with("ha"), list(sum = ~sum(.))),
+    imp_pct_pid_mean = mean(imp_pct)
+    ) |> 
+  mutate(imp_pct_grnd_tot = imp_ha_sum / tot_ha_sum)
+
+rde_wria <- rde_cnty |> 
+  #allow duplication of spanning reaches: #distinct(pid, .keep_all = T) |> 
+  rename_with(~str_remove(., "nonfstry_")) |> 
+  summarise(
+    across(
+      c(stream_miles, reach_ac, riparian_ac,
+        rmz_ac, eow_ac, flood_ac, 
+        impv_inc_ac, semi_inc_ac
+      ), ~sum(., na.rm = T)),
+    .by = "wria"
+  ) |> 
+  mutate(
+    stream_km = stream_miles * 1.61,
+    reach_ha = ha*reach_ac,
+    riparian_ha = ha*riparian_ac,
+    impv_inc_ha = ha*impv_inc_ac,
+    impv_reach_pct = impv_inc_ac / reach_ac,
+    impv_ripar_pct = impv_inc_ac / riparian_ac,
+    semi_inc_ha = ha*semi_inc_ac,
+    semi_reach_pct = semi_inc_ac / reach_ac
+  )
+
+rde_wria |> filter(wria == "10") |> select(contains("_ha"), contains("pct"))
+
+#need/want this? semi_join(rde_cnty, by = "pid")
+
+sf_rde_10_imp <- sf_rde_10 |> 
+  left_join(
+    rde_10_ccap |> 
+      mutate(
+        tot_ha = count * 0.0001,
+        imp_ha = sum * 0.0001,
+        imp_pct = imp_ha/tot_ha #sum/count
+      )
+    ,
+    by = c("pid","zone")
+  )
+
+#mapview::mapview(sf_rde_10_imp, zcol = "imp_ha")
+#mapview::mapview(sf_rde_10_imp, zcol = "imp_pct")
+sf_rde_10_imp |> filter(imp_ha > 0) |> mapview::mapview(zcol = "imp_pct")
+
+#calc imp_pct collapsed over zone
+as_tibble(sf_rde_10_imp) |> 
+  summarise(across(ends_with("ha"), sum), .by = c(pid)) |> #summary()
+  mutate(imp_pct = imp_ha/tot_ha) |> 
+  ggplot() + geom_col(aes(imp_pct, fct_reorder(pid, imp_pct, min)))
+
+
+as_tibble(sf_rde_10_imp) |> 
+  select(pid, zone, ends_with("_ha")) |> 
+  pivot_wider(names_from = zone, values_from = ends_with("_ha")) |> 
+  left_join(
+    rde_cnty |> 
+      mutate(
+        eow_ha = ha*eow_ac,
+        rmz_ha = ha*rmz_ac,
+        impv_inc_ha = ha*nonfstry_impv_inc_ac,
+        semi_inc_ha = ha*nonfstry_semi_inc_ac,
+      ) |> 
+      select(pid, cnty, wria, ends_with("_ha"))
+    ,
+    by = "pid"
+  ) |> 
+  # #44 pids in spatial object that are missing from reach_table object
+  # filter(is.na(cnty))
+  drop_na(cnty) |> 
+  mutate(across(contains("_ha"), ~replace_na(., 0))) |> 
+  ggplot() +
+  geom_point(aes(impv_inc_ha, imp_ha_EOW+imp_ha_RMZ), alpha = 0.5, size = 0.4)
+  
+
+```
+
+```{r ccap_2021_wrialoop}
+library(exactextractr)
+
+ccap_imp <- terra::rast("~/T/DFW-Team WDFW Watershed Synthesis - data_common/ccap/wa_2021_ccap_v2_hires_impervious_20250407/wa_2021_ccap_v2_hires_impervious_20250407.tif")
+
+fp <- list.files(pattern = ".gpkg") #PS wrias 1-19 only RMZ and EOW but no attribute of SPTH200 value
+
+rde_ccap <- map(fp, ~NULL) |> set_names(fp) #str_sub(fp,-12,-6)
+
+for (f in fp){
+  sf_rde <- st_read(f) |> st_transform(st_crs(ccap_imp))
+  ccap_imp_crop <- terra::crop(ccap_imp, sf_rde)
+  rde_ccap[[f]] <- exact_extract(ccap_imp_crop, sf_rde, fun = c("sum","count"), append_cols = c("pid","zone"))
+}
+
+saveRDS(rde_ccap, "rde_ccap.rds")
+
+rde_ccap_df <- bind_rows(rde_ccap) 
+
+saveRDS(rde_ccap_df, "rde_ccap_df.rds")
+```
+
+```{r ccap_2021}
+#removing reaches duplicated over wria & county
+rde_ccap_df <- inner_join(
+  rde_cnty |> 
+    distinct(pid, .keep_all = T) |> 
+    ## comparison complicated/invalidated by various factors but esp inclusion of floodplains 
+    ## can filter to pid with 0 floodplain_ac but that ignores many downstream reaches
+    # mutate(
+    #   eow_ha = ha*eow_ac,
+    #   rmz_ha = ha*rmz_ac,
+    #   impv_inc_ha = ha*nonfstry_impv_inc_ac,
+    #   semi_inc_ha = ha*nonfstry_semi_inc_ac,
+    # ) |> 
+    # select(pid, cnty, wria, ends_with("_ha"))
+    select(pid, wria, cnty, city_uga_names)
+  ,
+  readRDS("rde_ccap_df.rds") |>
+    mutate(
+      tot_ha = count * 0.0001,
+      imp_ha = sum * 0.0001 
+    ) |> 
+    pivot_wider(names_from = zone, values_from = ends_with("_ha")) |> 
+    mutate(
+      across(where(is.numeric), ~replace_na(., 0)),
+      tot_ha = tot_ha_EOW + tot_ha_RMZ,
+      imp_ha = imp_ha_EOW + imp_ha_RMZ,
+      imp_pct = imp_ha/tot_ha #sum/count
+    )
+  ,
+  by = c("pid")
+)
+
+bind_rows(
+  rde_ccap_df |> 
+  filter(as.numeric(wria) < 20, cnty != "Grays Harbor") |> 
+  summarise(
+    across(contains("_ha"), list(sum = ~sum(.))),
+    imp_pct_pid_mean = mean(imp_pct),
+    .by = cnty
+    ) |> 
+  mutate(imp_pct_grnd_tot = imp_ha_sum / tot_ha_sum) 
+,
+rde_ccap_df |> 
+  summarise(
+    across(contains("_ha"), list(sum = ~sum(.))),
+    imp_pct_pid_mean = mean(imp_pct)
+    ) |> 
+  mutate(cnty = "Total", imp_pct_grnd_tot = imp_ha_sum / tot_ha_sum)
+) |>
+  select(County = cnty, `Assessed ha` = tot_ha_sum, `Impervious ha` = imp_ha_sum, `Impv. %` = imp_pct_grnd_tot, `Mean reach impv. %` = imp_pct_pid_mean) |> 
+  arrange(desc(`Impervious ha`)) |> 
+  gt(caption = "2021 CCAP 1m impervious surface within RDE RMZ & EOW") |> 
+  fmt_number(columns = 2:3, decimals = 0) |> 
+  fmt_percent(columns = 4:5, decimals = 1) #|> gt::gtsave(filename = "t3_ccap1m_western_wa.png")
+
+#stratify by UGA within county bounds
+#leaving double sum_sum names to denote aggregation first by individual jurisdiction then binary UGA within county
+rde_ccap_df_uga <- rde_ccap_df |> 
+  filter(as.numeric(wria) < 20, cnty != "Grays Harbor", cnty != "Lewis") |> 
+  summarise(
+    across(contains("_ha"), list(sum = ~sum(.))),
+    imp_pct_pid_mean = mean(imp_pct),
+    .by = c(cnty, city_uga_names)
+    ) |> 
+  mutate(imp_pct_grnd_tot = imp_ha_sum / tot_ha_sum) |> 
+  arrange(desc(tot_ha_sum)) |> #print(n=30)
+  mutate(uga = if_else(is.na(city_uga_names), "Non-UGA", "UGA"))
+
+rde_ccap_df_uga_sum <- rde_ccap_df_uga |> 
+  summarise(
+    across(contains("_ha"), list(sum = ~sum(.))),
+    .by = c(uga, cnty)
+  ) |> 
+  mutate(imp_pct = imp_ha_sum_sum / tot_ha_sum_sum) 
+
+rde_ccap_df_uga_sum |>
+  ggplot(aes(tot_ha_sum_sum, imp_ha_sum_sum, color = uga)) +
+  geom_point() + geom_smooth(method = "lm", se = F) + scale_color_grey() +
+  geom_text(aes(label = cnty), size = 3) +
+  labs(x = "RDE RMZ+EOW assessed ha in county bounds", y = "RDE RMZ+EOW 2021 CCAP imperv. ha in county bounds")
+
+rde_ccap_df_uga_sum |> 
+  select(cnty, uga, tot_ha_sum_sum, imp_ha_sum_sum, imp_pct) |> 
+  pivot_wider(names_from = uga, values_from = -c(cnty, uga)) |> 
+  ggplot(aes(imp_pct_UGA, `imp_pct_Non-UGA`)) +
+  #geom_point() +
+  geom_text(aes(label = cnty), size = 3)
+
+rde_ccap_df_uga_sum |> 
+  ggplot(aes(imp_pct, uga)) +
+  geom_boxplot(varwidth = T, outliers = F) + 
+  #geom_jitter(height = 0.3, size = 0.5) +
+  geom_text(aes(label = cnty), position = position_jitter(height = 0.3), size = 3) +
+  scale_x_continuous(labels = scales::label_percent()) +
+  labs(x = "Impervious portion of assessed RDE RMZ+EOW", y = NULL)
+
+#as table
+bind_rows(
+  rde_ccap_df_uga_sum
+  ,
+  rde_ccap_df_uga_sum |> 
+    summarise(across(contains("_ha"), ~sum(., na.rm = T)), .by = uga) |> 
+    mutate(cnty = "Total", imp_pct = imp_ha_sum_sum / tot_ha_sum_sum)
+) |>
+  select(cnty, uga, tot_ha_sum_sum, imp_ha_sum_sum, imp_pct) |> 
+  pivot_wider(names_from = uga, values_from = -c(cnty, uga)) |> 
+  mutate(
+    tot_pct_UGA = tot_ha_sum_sum_UGA / (tot_ha_sum_sum_UGA + `tot_ha_sum_sum_Non-UGA`)
+    ,
+    #ratio = `imp_pct_Non-UGA` / imp_pct_UGA
+    ratio = imp_pct_UGA / `imp_pct_Non-UGA`
+  ) |> 
+  arrange(desc(imp_ha_sum_sum_UGA)) |> 
+  gt(caption = "Impervious surface from 2021 CCAP 1m within RDE RMZ & EOW\n by combined UGAs within county bounds ") |> 
+  cols_label_with(fn = ~str_remove_all(., "tot_ha_sum_sum_|imp_ha_sum_sum_|tot_|imp_pct_")) |> 
+  cols_label(cnty = " ", tot_pct_UGA = "%UGA") |> 
+  tab_spanner("Assessed", columns = starts_with("tot")) |> 
+  tab_spanner("Impervious", columns = c(starts_with("imp_"), "ratio")) |> 
+  tab_style(style = cell_text(weight = "bold"), locations = cells_body(rows = cnty == "Total")) |> 
+  fmt_number(columns = contains("sum"), decimals = 0) |> 
+  fmt_number(columns = "ratio", decimals = 1) |> 
+  fmt_percent(columns = contains("pct"), decimals = 1) |> 
+  sub_missing() #|> gt::gtsave(filename = "t3_ccap1m_western_wa.png")
+
+
+
+```
+
+![](t3_ccap1m_western_wa.png)
+
 
 ```{r nhdp_vs_hrcd, eval=FALSE}
 #roughing out NHDplus vs HRCD
@@ -1270,7 +1567,6 @@ unique(sf_hrcd$CountyNm) #still only 25, so a
 as_tibble(sf_hrcd) |> filter(CountyNm == "Yakima") |> count(StartYr) #missing many E side records
 
 ```
-
 
 ```{r gg_rde_cnty_sum_reach_pct_cnty, eval=FALSE}
 {
