@@ -538,6 +538,33 @@ sc_nlcd_year_sum <- sc_nlcd |>
 #   ) |> 
 #   rename_with(~str_remove(., "nonfstry_"))
 
+
+# # correct statewide totals due to 'distinct(pid)'
+# rde_swifd_sum |> select(swifd_chin, ends_with("ha")) 
+# # # but totals across counties are not usable due to duplication of county-spanning reaches
+# # rde_cnty_sum |> summarise(across(ends_with("ha"), sum)) 
+# # # and/but duplication has minimal/negligible significance
+# # pid_dupe <- rde_cnty |> count(pid) |> filter(n>1)
+# # rde_cnty |> semi_join(pid_dupe, by = "pid") |> count(cnty)
+# # rde_cnty |> semi_join(pid_dupe, by = "pid") |> summarize(across(nonfstry_impv_inc_ac, ~sum(.,na.rm = T))) 
+# # rde_cnty |> anti_join(pid_dupe, by = "pid") |> summarize(across(nonfstry_impv_inc_ac, ~sum(.,na.rm = T))) 
+# 
+# # however, a very large EOW Columbia River reservoir pid is inflating UGA reach_ac in Douglas and Grant Co.
+# rde_cnty |> filter(str_detect(city_uga_names, "Grand Coulee - Unincorporated UGA")) |> arrange(desc(reach_ac))
+# # but not affecting impervious
+# rde_cnty |> filter(pid == "147545869") |> select(pid, cnty, nonfstry_impv_inc_ac)
+# # could manually exclude EOW outliers?
+# rde_cnty |> 
+#   drop_na(city_uga_names) |> 
+#   #filter(cnty == "Douglas") |> 
+#   summarize(
+#     n = n(),
+#     across(c(reach_ac, eow_ac, rmz_ac, flood_ac), ~sum(., na.rm = T)),
+#     .by = c(cnty, city_uga_names)
+#     ) |> 
+#   arrange(desc(reach_ac)) |> filter(n == 1)
+
+
 rde_cnty_sum <- rde_cnty |> 
   rename_with(~str_remove(., "nonfstry_")) |> 
   mutate(uga = if_else(is.na(city_uga_names), "Non-UGA", "UGA")) |> 
@@ -571,7 +598,7 @@ rde_impv <- rde_cnty |>
     impv_inc_ha = ha*impv_inc_ac,
     cimp = cumsum(impv_inc_ha),
     rank = dense_rank(cimp), 
-    cimp_pct = cimp / sum(cimp),
+    cimp_pct = cimp / sum(impv_inc_ha),
     n_pct = seq_along(cimp) / length(cimp),
     fld_pct = flood_ac / reach_ac,
     eow_pct = eow_ac / reach_ac,
@@ -609,6 +636,837 @@ sf_cnty_rde_sc <- sf_cnty |>
   left_join(sc_nlcd_year_cnty_sum, by = "cnty")
 
 ```
+
+```{r bootstrap_uncertainty_intervals}
+#could impose systematically as dual gradients over steps: varying frac of rows and magnitude of +/-
+#e.g.: err_pcts <- c(0.25,0.5,0.75, 1.25,1.5,1.75)
+#but can also sample from uniform range of continuous vals on all rows
+
+npid <- nrow(rde_impv) # 7437 RDE units with non-zero impervious increases
+nrep <- 100 # just an easy number to work with
+#make a 7437x100 matrix to keep memory stable
+m <- matrix(rep(rde_impv$impv_inc_ha, nrep), ncol = nrep)
+#then loop over this 'inner' matrix just preserving the sum in an 'outer'
+mm <- matrix(NA, nrow = 1000, ncol = nrep)
+for(r in 1:nrow(mm)){
+  mm[r,] <- colSums(apply(m, 2, \(x) x * runif(npid, min = 0, max = 2)))
+}
+mm <- as.vector(mm)
+summary(mm)
+
+ggplot(as_tibble(mm)) + 
+  geom_density(aes(value)) + 
+  geom_vline(xintercept = fivenum(mm)[2:4], linetype = 2) +
+  geom_vline(xintercept = sum(rde_impv$impv_inc_ha), color = "#7E4837") +
+  labs(
+    x = "Estimate of total impervious increase",
+    subtitle = paste(length(mm), " replicates, imposing [0,2] factor per-RDE reach increase")
+  )
+
+#individual changes look approx lognormal
+{ggplot(rde_impv) + geom_density(aes(impv_inc_ha))}/
+{ggplot(rde_impv) + geom_density(aes(impv_inc_ha)) + scale_x_log10()}
+
+
+## alternatively, bootstrap resample the whole thing
+d <- rde_cnty |> 
+  distinct(pid, .keep_all = T) |> 
+  arrange(desc(nonfstry_impv_inc_ac)) |> 
+  mutate(impv_inc_ha = ha*replace_na(nonfstry_impv_inc_ac, 0)) |> 
+  select(pid, impv_inc_ha)
+
+sum(d$impv_inc_ha)
+
+#most basic: resample the entire vector with replacement
+#samp_pct <- round(0.1*length(d$impv_inc_ha)) #using a portion requires splitting and tracking the other portion
+samp_pct <- length(d$impv_inc_ha)
+sum(sample(d$impv_inc_ha, size = samp_pct, replace = T))
+
+bs <- sapply(1:1000, \(x){ sum(sample(d$impv_inc_ha, size = samp_pct, replace = T)) })
+
+ggplot(as_tibble(bs)) + 
+  geom_density(aes(value)) + 
+  geom_vline(xintercept = fivenum(bs)[2:4], linetype = 2) +
+  geom_vline(xintercept = sum(rde_impv$impv_inc_ha), color = "#7E4837") +
+  labs(
+    x = "Estimate of total impervious increase",
+    subtitle = paste(length(bs), "")
+  )
+```
+
+
+```{r rde_huc12}
+
+# # looked for a tabular existing lookup of WBD HUC12 on NHD, but only found for NHDplus v2
+# # via https://www.sciencebase.gov/catalog/item/5c86a747e4b09388244b3da1
+# lu_comid_huc12 <- read_csv("~/T/DFW-Team WDFW Watershed Synthesis - data_common/NHDPlus17/CrosswalkTable_NHDplus_HU12.csv") |> 
+#   mutate(comid = as.character(FEATUREID)) |> 
+#   select(comid, HUC_12)
+
+# # not statewide: sf_hr_h12 <- readRDS("~/T/DFW-Team WDFW Watershed Synthesis - General/fifo/sf_nhdphr_08_11_h12.rds")
+sf_wa_huc12 <- readRDS(file.path(dir_data_common, "wbd/sf_wa_huc12.rds"))
+#sf_huc4 <- readRDS(file.path(dir_data_common, "wbd/sf_huc4.rds")) |>sf::st_transform(sf::st_crs(epsg))
+
+# # RMZ+EOW per WRIA from tess_export.R
+# fp <- list.files(pattern = ".gpkg")[30:62]
+# sf_rde_huc12 <- map(fp, ~NULL) |> set_names(fp)
+# 
+# # 33 wrias worth of intersections, takes a few minutes
+# # this is both RMZ and EOW zones, duplicating pids
+# for (f in fp){
+#   sf_rde <- st_read(f) |> st_transform(st_crs(sf_wa_huc12))
+#   sf_rde_huc12[[f]] <- st_join(
+#     sf_rde,
+#     sf_wa_huc12,
+#     largest = T
+#   )
+# }
+# 
+# bind_rows(sf_rde_huc12) |> as_tibble() |> select(-geom) |> count(zone)
+# # preserve full object without geometry
+# rde_huc12 <- bind_rows(sf_rde_huc12) |> as_tibble() |> select(-geom) 
+# # 402,974 rows but 374,118 distinct pid
+# rde_huc12 |> distinct(pid) 
+# rde_huc12 |> distinct(pid, zone) |> count(pid)
+# # 65 pid-zone pairs that duplicate
+# rde_huc12 |> count(pid, zone, huc12) |> filter(n>1) |> arrange(pid) |> print(n=Inf)
+# # deduplicate artifacts from WRIA-spanning reaches, not losing anything
+# rde_huc12 <- rde_huc12 |> distinct(pid, zone, huc12, .keep_all = T)
+# # saveRDS(rde_huc12, "rde_huc12.rds")
+
+
+rde_huc12 <- readRDS("rde_huc12.rds")
+rde_huc12_rmz <- readRDS("rde_huc12.rds") |> filter(zone == "RMZ")
+
+
+# join the RDE-HRLC attributes back to the HUC12 geometry after joining HUC12 to RDE and summarizing by HUC12
+sf_huc12_rmz <- sf_wa_huc12 |> 
+  inner_join(
+    rde_cnty |> 
+      distinct(pid, .keep_all = T) |> 
+      filter(wria %in% as.character(30:62)) |> 
+      rename_with(~str_remove(., "nonfstry_")) |> 
+      mutate(uga = if_else(is.na(city_uga_names), "Non-UGA", "UGA") |> factor(levels = c("UGA","Non-UGA"))) |> 
+      inner_join(
+        rde_huc12_rmz |> select(-area)
+        ,
+        by = "pid"
+        ) |> 
+      summarise(
+        across(
+          c(
+            rch = reach_ac, 
+            # #rip = riparian_ac,
+            # rmz = rmz_ac, 
+            # eow = eow_ac,
+            # fld = flood_ac,         
+            #,impv_inc = impv_inc_ac, semi_inc = semi_inc_ac
+            tree = all_tree_cover_ac,
+            veg = all_vegetated_ac
+          ),
+          list(ac = ~sum(., na.rm = T))
+        )
+        ,
+        across(
+          c(tree_pct, veg_pct),
+          list(rch_mean = ~mean(., na.rm = T))
+        )
+        , .by = c(huc12)
+      ) |> 
+      mutate(
+        #swifd_any = if_else(swifd_any, "salmon","not_salmon") |> factor(levels = c("salmon","not_salmon")),
+        across(c(tree_ac, veg_ac), list(pct = ~./rch_ac))
+      )
+    ,
+    by = "huc12" 
+  )
+
+# export for Allie/WSU
+st_write(sf_huc12_rmz, "sf_huc12_rmz.gpkg")
+st_read("sf_huc12_rmz.gpkg") -> x; x
+
+
+d |> 
+  ggplot() + 
+  geom_sf(aes(fill = tree_ac, color = tree_ac)) + scale_fill_gradient(low = "tan", high = "darkgreen", aesthetics = c("fill","color")) + 
+  ggspatial::annotation_scale() +
+  labs(subtitle = "Total treed acres (RMZ+EOW+floodplain 2017 HRLC) by HUC12")
+
+d |>
+  ggplot() + 
+  geom_sf(aes(fill = tree_pct_rch_mean, color = tree_pct_rch_mean)) + scale_fill_gradient(low = "tan", high = "darkgreen", aesthetics = c("fill","color")) + 
+  ggspatial::annotation_scale() +
+  labs(subtitle = "Mean per-reach %tree (RMZ+EOW+floodplain 2017 HRLC) by HUC12")
+
+d |> as_tibble() |> summary()
+
+# this does not really work for bivariate?
+ggplot() + 
+  geom_sf(data = d |> drop_na(veg_pct_rch_mean), aes(alpha = veg_pct_rch_mean), fill = "yellowgreen", color = "yellowgreen") +
+  geom_sf(data = d |> drop_na(tree_pct_rch_mean), aes(alpha = tree_pct_rch_mean), fill = "darkgreen", color = "darkgreen") +
+  ggspatial::annotation_scale() +
+  labs(subtitle = "Mean per-reach %tree (RMZ+EOW+floodplain 2017 HRLC) by HUC12")
+
+
+d |> 
+  drop_na(veg_pct_rch_mean) |> 
+  biscale::bi_class(x = veg_pct_rch_mean, y = tree_pct_rch_mean, style = "quantile", dim = 3) |> 
+  ggplot() + 
+  geom_sf(aes(fill = bi_class), show.legend = F) +
+  biscale::bi_scale_fill("PurpleOr", dim = 3, aesthetics = c("fill","color")) + 
+  biscale::bi_legend(pal = "PurpleOr", dim = 3,
+                    xlab = "mean %veg", ylab = "mean %tree",
+                    size = 8)
+
+  labs(subtitle = "Mean per-reach %tree (blue) & %vegetated (yellow), RMZ+EOW+floodplain 2017 HRLC, by HUC12")
+
+
+
+```
+
+
+```{r rev_fig_1overlay}
+# 3rd panel showing higher zoom?
+
+sf_aoi <- st_as_sf(st_as_sfc(
+  st_bbox(
+    #c(xmin = 1064273, xmax = 1064273+60000, ymin = 800000, ymax = 800000+90000), #Poulsbo to Pt Orchard
+    c(xmin = 1200000, xmax = 1200000+15000, ymin = 679000, ymax = 679000+30000), #Sumner
+    crs = st_crs(epsg))
+  ))
+
+sf_aoi_zoom <- st_as_sf(st_as_sfc(
+  st_bbox(
+    c(xmin = 1200000, xmax = 1205000, ymin = 702000, ymax = 709000),
+    crs = st_crs(epsg))
+  ))
+
+sf_aoi_zoom_osm <- maptiles::get_tiles(sf_aoi_zoom, provider = "OpenStreetMap", crop = TRUE) 
+sf_aoi_zoom_esri <- maptiles::get_tiles(sf_aoi_zoom, provider = "Esri.WorldImagery", crop = TRUE) 
+
+# #resaved
+# sf_aoi_geo <- readRDS("fig_corridors.rds")
+# 
+# sf_aoi_geo$hrcd_union_imppct <- sf_aoi_geo$hrcd |> group_by(ImpIncPct) |> summarise(ImpIncPct = mean(ImpIncPct))
+# sf_aoi_geo$hrcd_union_imppct_zoom <- sf_aoi_geo$hrcd_union_imppct |> st_crop(sf_aoi_zoom)
+# 
+# #very slow...but finished
+# sf_aoi_geo$nlcd_aoi_zoom <- FedData::get_nlcd(sf_aoi_zoom, "aoi_zoom", year = 2016)
+# #works, okay for vis: terra::project(sf_aoi_geo$nlcd_aoi_zoom, paste0("epsg:",epsg))
+# 
+# sf_aoi_geo$flw_rp100_aoi_zoom <- sf_aoi_geo$flw_rp100 |> st_crop(sf_aoi_zoom)
+# sf_aoi_geo$fld_aoi_zoom <- sf_aoi_geo$fld |> st_crop(sf_aoi_zoom)
+# 
+# sf_aoi_geo$fld_aoi_union <- sf_aoi_geo$fld |> st_crop(sf_aoi) |> group_by(Zone) |> summarise()
+# saveRDS(sf_aoi_geo, "fig_overlay.rds")
+sf_aoi_geo <- readRDS("fig_overlay.rds")
+
+
+list(
+  ggplot() + 
+    geom_sf(data = sf_cnty, fill = NA) +
+    geom_sf(data = st_centroid(sf_aoi), color = "blue", fill = "blue", size = 2) +
+    ggspatial::annotation_scale() + theme_void()
+  ,
+  # ggplot() +
+  #   geom_sf(data = sf_aoi_geo$flw_rp100 |> st_union() |> st_crop(sf_aoi), fill = NA, color = "darkblue", linewidth = 1) +
+  #   geom_sf(data = sf_aoi_geo$fld |> st_crop(sf_aoi) |> filter(Zone == "RMZ"), fill = NA, color = "green", linewidth = 0.8) +
+  #   geom_sf(data = sf_aoi_geo$fld |> st_crop(sf_aoi) |> filter(Zone == "OMZ"), color = "#69A2E4" , fill = "#69A2E4", alpha = 0.7) +
+  #   geom_sf(data = sf_aoi_geo$fld |> st_crop(sf_aoi) |> filter(Zone == "Flood"), color = "#61853A" , fill = "#61853A", alpha = 0.7) +
+  #   geom_sf(data = sf_aoi_geo$hrcd_union_imppct, fill = "orange", color = "grey20", alpha = 0.6) +
+  #   geom_sf(data = sf_aoi_zoom, fill = NA, color = "pink", linewidth = 1) +
+  #   ggspatial::annotation_scale() + theme_void()
+  ggplot() +
+    geom_sf(data = sf_aoi_geo$flw_rp100 |> st_union() |> st_crop(sf_aoi), fill = NA, color = "darkblue", linewidth = 1) +
+    geom_sf(data = sf_aoi_geo$fld_aoi_union |> filter(Zone == "RMZ"), fill = NA, color = "#00C70A", linewidth = 0.8) +
+    geom_sf(data = sf_aoi_geo$fld_aoi_union |> filter(Zone == "OMZ"), color = "#69A2E4" , fill = "#69A2E4", alpha = 0.7) +
+    geom_sf(data = sf_aoi_geo$fld_aoi_union |> filter(Zone == "Flood"), color = "#61853A" , fill = "#61853A", alpha = 0.7) +
+    geom_sf(data = sf_aoi_geo$hrcd_union_imppct, fill = "orange", color = "grey20", alpha = 0.6) +
+    geom_sf(data = sf_aoi_zoom, fill = NA, color = "pink", linewidth = 1) +
+    ggspatial::annotation_scale() + theme_void()
+  ,
+  ggplot() + 
+    tidyterra::geom_spatraster_rgb(data = sf_aoi_zoom_osm) +
+    geom_sf(data = sf_aoi_geo$flw_rp100_aoi_zoom, fill = NA, color = "darkblue", linewidth = 1) +
+    geom_sf(data = sf_aoi_geo$fld_aoi_zoom |> filter(Zone == "RMZ"), fill = NA, color = "#00C70A", linewidth = .8) +
+    geom_sf(data = sf_aoi_geo$fld_aoi_zoom |> filter(Zone == "OMZ"), color = "#69A2E4" , fill = "#69A2E4", alpha = 0.7) +
+    geom_sf(data = sf_aoi_geo$fld_aoi_zoom |> filter(Zone == "Flood"), color = "#61853A" , fill = "#61853A", alpha = 0.7) +
+    #geom_sf(data = sf_aoi_geo$hrcd_union_imppct_zoom, fill = "grey20")
+    geom_sf(data = sf_aoi_geo$hrcd_union_imppct_zoom, fill = "orange") +
+    ggspatial::annotation_scale() + theme_void() 
+  ,
+  ggplot() + 
+    tidyterra::geom_spatraster_rgb(data = sf_aoi_zoom_esri) +
+    geom_sf(data = sf_aoi_geo$flw_rp100_aoi_zoom, fill = NA, color = "darkblue", linewidth = 1) +
+    geom_sf(data = sf_aoi_geo$fld_aoi_zoom |> filter(Zone == "RMZ"), fill = NA, color = "#00C70A", linewidth = .8) +
+    geom_sf(data = sf_aoi_geo$fld_aoi_zoom |> filter(Zone == "OMZ"), color = "#69A2E4" , fill = "#69A2E4", alpha = 0.7) +
+    geom_sf(data = sf_aoi_geo$fld_aoi_zoom |> filter(Zone == "Flood"), color = "#61853A" , fill = "#61853A", alpha = 0.7) +
+    geom_sf(data = sf_aoi_geo$hrcd_union_imppct_zoom, fill = "orange") +
+    ggspatial::annotation_scale()  + theme_void() 
+#   ,
+#   ggplot() + 
+# tidyterra::geom_spatraster(data = terra::project(sf_aoi_geo$nlcd_aoi_zoom, paste0("epsg:",epsg))) +  
+#     geom_sf(data = sf_aoi_geo$flw_rp100_aoi_zoom, fill = NA, color = "darkblue", linewidth = 1.2) +
+#     geom_sf(data = sf_aoi_geo$fld_aoi_zoom |> filter(Zone == "RMZ"), fill = NA, color = "darkgreen", linewidth = 1.2) +
+#     geom_sf(data = sf_aoi_geo$fld_aoi_zoom |> filter(Zone == "OMZ"), color = "#69A2E4" , fill = "#69A2E4", alpha = 0.7) +
+#     geom_sf(data = sf_aoi_geo$fld_aoi_zoom |> filter(Zone == "Flood"), color = "#61853A" , fill = "#61853A", alpha = 0.7) +
+#     geom_sf(data = sf_aoi_geo$hrcd_union_imppct_zoom, fill = "orange") +
+#     ggspatial::annotation_scale()  + theme_void() 
+) |> 
+  wrap_plots(design = "AB\nCB\nDB") + 
+  plot_annotation(tag_levels = "a")
+
+ggsave("../wa_riparian_impervious/rev_f1_overlay.png", bg = "white", width = 8, height = 10, dpi = 300)
+
+```
+
+```{r rev_fig_2assessed}
+
+# break UGA and SWIFD panels out to separate figs
+d <- sf_cnty |> 
+  mutate(cnty_ha = st_area(geometry) |> units::set_units("hectares") |> as.numeric()) |> 
+  left_join(
+    rde_cnty_sum |> 
+      summarise(across(ends_with("_ha"), sum), .by = cnty), by = "cnty"
+  ) |> 
+  left_join(
+    sc_nlcd |> filter(nlcd_year==2011) |> #all years identical
+      summarise(rp100_ha = round(100*sum(catareasqkmrp100)), .by = cnty), by = "cnty"
+  )
+
+cnty_nudge_y <- set_names(rep(0, nrow(d)), d$cnty)
+cnty_nudge_y["Columbia"] <- -45000
+
+list(
+  ggplot(d) +
+    geom_sf(fill = "white", color = "grey10", show.legend = F) +
+    geom_sf(data = sf_wa_city, color = "brown", show.legend = F) +
+    geom_sf_text(data = sf_wa_city, aes(label = name), color = "brown", position = "jitter", hjust = 1.1, size = 3, show.legend = F) +
+    labs(x = NULL, y = NULL) + theme(axis.text = element_blank())
+  ,
+  ggplot(d) +
+    geom_sf(fill = "white", color = "grey10", show.legend = T) +
+    geom_sf_text(aes(label = cnty), color = "grey10", size = 2.7, position = position_nudge(y = cnty_nudge_y)) +
+    labs(x = NULL, y = NULL) + theme(axis.text = element_blank())
+  ,  
+  ggplot(d) + 
+    geom_sf(aes(fill = rch_ha), show.legend = T) +
+    scale_fill_gradient(
+      name = "RDE ha", labels = scales::label_comma(),
+      low = "#BEE7DF", high = "#212540", na.value = "pink",
+      limits = c(0, 300000)) +
+    labs(x = NULL, y = NULL) + theme(axis.text = element_blank()) #theme(axis.text = element_text(size = 3))
+  ,
+  ggplot(d) + 
+    geom_sf(aes(fill = rp100_ha), show.legend = T) +
+    scale_fill_gradient(
+      name = "rp100 ha", labels = scales::label_comma(),
+      low = "#BEE7DF", high = "#212540", na.value = "pink",
+      limits = c(0, 300000)) +
+    labs(x = NULL, y = NULL) + theme(axis.text = element_blank())
+  ,
+  ggplot(d) + 
+    geom_sf(aes(fill = rch_ha/cnty_ha), show.legend = T) +
+    scale_fill_gradient(
+      name = "RDE %", labels = scales::label_percent(),
+      #low = "grey90", high = "grey20", na.value = "pink",
+      low = "#BEE7DF", high = "#212540", na.value = "pink",
+      limits = c(0, 1)) +
+    labs(x = NULL, y = NULL) + theme(axis.text = element_blank())
+  ,
+  ggplot(d) + 
+    geom_sf(aes(fill = rp100_ha/cnty_ha), show.legend = T) +
+    scale_fill_gradient(
+      name = "rp100 %", labels = scales::label_percent(),
+      #low = "grey90", high = "grey20", na.value = "pink",
+      low = "#BEE7DF", high = "#212540", na.value = "pink",
+      limits = c(0, 1)) +
+    labs(x = NULL, y = NULL) + theme(axis.text = element_blank())
+) |>
+  wrap_plots(design = "AB\nCD\nEF", guides = "keep") + 
+  plot_annotation(tag_levels = "a")
+
+ggsave("../wa_riparian_impervious/rev_f2_assessed.png", bg = "white", width = 11, height = 11, dpi = 300)
+```
+
+showing that RDE is mostly imperv and semi follows a similar spatial distribution
+but NLCD is more medium and medium has a somewhat different spatial distrib with more in E counties
+```{r rev_fig_3imperv}
+
+d <- sf_cnty |> 
+  mutate(cnty_ha = st_area(geometry) |> units::set_units("hectares") |> as.numeric()) |> 
+  left_join(
+    rde_cnty_sum |> 
+      summarise(across(ends_with("_ha"), sum), .by = cnty), by = "cnty"
+  ) |> 
+  left_join(
+    sc_nlcd_year_cnty_sum |> 
+      mutate(
+        hi_ha = `2016_urbhi` - `2011_urbhi`, 
+        md_ha = `2016_urbmd` - `2011_urbmd`,
+        hi_md_ha = hi_ha + md_ha
+        ) |> 
+      select(cnty, rp100_ha, hi_ha, md_ha, hi_md_ha), by = "cnty"
+  )
+
+# only do %, break out 3 rows of impv, semi, both and hi, med, both 
+list(
+    ggplot(d) + 
+    geom_sf(aes(fill = impv_inc_ha / rch_ha), color = "black", show.legend = T) +
+    scale_fill_gradient(name = "new impv\nportion RDE", low = "grey99", high = "grey20", limits = c(0, .005), labels = scales::label_percent()) + 
+    labs(x = NULL, y = NULL) + theme(axis.text = element_blank())
+    ,
+    ggplot(d) + 
+    geom_sf(aes(fill = hi_ha / rp100_ha), color = "black", show.legend = T) +
+    scale_fill_gradient(name = "new high\nportion rp100", low = "grey99", high = "grey20", limits = c(0, .005), labels = scales::label_percent()) + 
+    labs(x = NULL, y = NULL) + theme(axis.text = element_blank())
+    ,
+    ggplot(d) + 
+    geom_sf(aes(fill = semi_inc_ha / rch_ha), color = "black", show.legend = T) +
+    scale_fill_gradient(name = "new semi\nportion RDE", low = "grey99", high = "grey20", limits = c(0, .005), labels = scales::label_percent()) + 
+    labs(x = NULL, y = NULL) + theme(axis.text = element_blank())
+    ,
+    ggplot(d) + 
+    geom_sf(aes(fill = md_ha / rp100_ha), color = "black", show.legend = T) +
+    scale_fill_gradient(name = "new med.\nportion rp100", low = "grey99", high = "grey20", limits = c(0, .005), labels = scales::label_percent()) + 
+    labs(x = NULL, y = NULL) + theme(axis.text = element_blank())
+    ,
+    ggplot(d) +
+    geom_sf(aes(fill = impv_semi_inc_ha / rch_ha), color = "black", show.legend = T) +
+    scale_fill_gradient(name = "new impv+semi\nportion RDE", low = "grey99", high = "grey20", limits = c(0, .005), labels = scales::label_percent()) +
+    labs(x = NULL, y = NULL) + theme(axis.text = element_blank())
+    ,
+    ggplot(d) +
+    geom_sf(aes(fill = hi_md_ha / rp100_ha), color = "black", show.legend = T) +
+    scale_fill_gradient(name = "new high+med.\nportion rp100", low = "grey99", high = "grey20", limits = c(0, .005), labels = scales::label_percent()) +
+    labs(x = NULL, y = NULL) + theme(axis.text = element_blank())
+    ) |> 
+  wrap_plots(design = "AB\nCD\nEF") +
+  plot_annotation(tag_levels = "a")
+
+ggsave("../wa_riparian_impervious/rev_f3_imperv.png", bg = "white", width = 13, height = 11, dpi = 300)
+
+```
+
+showing that overall statewide abs increase is spatially concentrated to S & Central PS 
+but that increases statewide are locally concentrated to UGAs
+```{r rev_fig_4uga}
+d <- sf_cnty |> 
+  mutate(cnty_ha = st_area(geometry) |> units::set_units("hectares") |> as.numeric()) |> 
+  left_join(
+    rde_cnty_sum |> 
+      summarise(across(ends_with("_ha"), sum), .by = cnty), by = "cnty"
+  ) |> 
+  left_join(
+    rde_cnty_sum |>
+      summarise(across(c(rch_ha, contains("_inc_ha")), sum), .by = c(cnty, uga)) |> 
+      pivot_wider(names_from = uga, values_from = c(rch_ha, contains("_inc_ha"))) |> 
+      mutate(across(-cnty, ~replace_na(., 0)))
+    , by = "cnty"
+  ) |> 
+  mutate(
+    # #uga portion of assessed in affected by ColR EOWs associated with unincorporated UGAs
+    # uga_pct_rch = rch_ha_UGA / rch_ha,
+    uga_impv_pct_inc = impv_inc_ha_UGA / impv_inc_ha,
+    uga_semi_pct_inc = semi_inc_ha_UGA / semi_inc_ha,
+    uga_both_pct_inc = impv_semi_inc_ha_UGA / impv_semi_inc_ha,
+    across(contains("pct"), ~replace_na(., 0))
+  )
+
+# # Douglas and Grant Co have larger UGA areas than Pierce due to pid == "147545869"
+# as_tibble(d) |> select(-geometry, -rip_ha) |> arrange(desc(impv_semi_inc_ha_UGA)) |> print(n=Inf)
+
+# as_tibble(d) |> select(contains("_UGA")) |> summary()
+
+sf_uga20 <- sf::read_sf(file.path(dir_data_common, "/census/uga20p/uga20p.shp")) |>  #378
+  # dplyr::left_join(
+  #   readr::read_csv(file.path(dir_data_common, "/census/uga20p/wa_2020_pl94171_ugap.csv")) |> 
+  #     dplyr::select(GEOID20 = GEOCODE, pop_tot = P00010001, pop_den = POPDEN, h_units = H00010001, h_units_occ = H00010002) |> 
+  #     dplyr::mutate(GEOID20 = as.character(GEOID20))
+  #   ,
+  #   by = "GEOID20"
+  # ) |> 
+  sf::st_transform(sf::st_crs(epsg))
+
+
+list(
+  # ggplot(d) + 
+  #   geom_sf(aes(fill = impv_inc_ha_UGA), show.legend = T) +
+  #   scale_fill_gradient(
+  #     name = "new impv ha\nUGA-associated", labels = scales::label_comma(),
+  #     low = alpha("orange",0.05), high = alpha("orange",1), na.value = "grey" #, limits = c(0, 1)
+  #     ) +
+  #   labs(x = NULL, y = NULL) + theme(axis.text = element_blank())
+  # ,
+  # ggplot(d) + 
+  #   geom_sf(aes(fill = semi_inc_ha_UGA), show.legend = T) +
+  #   scale_fill_gradient(
+  #     name = "new semi ha\nUGA-associated", labels = scales::label_comma(),
+  #     low = alpha("orange",0.05), high = alpha("orange",1), na.value = "grey" #, limits = c(0, 1)
+  #     ) +
+  #   labs(x = NULL, y = NULL) + theme(axis.text = element_blank())
+  # ,
+  ggplot(d) + 
+    geom_sf(aes(fill = impv_semi_inc_ha_UGA), show.legend = T) +
+    geom_sf(data = sf_uga20, color = "grey30", fill = "grey30", alpha = 0.5) +
+    scale_fill_gradient(
+      name = "new impv+semi ha\nUGA-associated", labels = scales::label_comma(),
+      low = alpha("orange",0.05), high = alpha("orange",1), na.value = "grey" #, limits = c(0, 1)
+      ) +
+    labs(x = NULL, y = NULL) + theme(axis.text = element_blank())
+  ,
+  # ggplot(d) + 
+  #   geom_sf(aes(fill = uga_impv_pct_inc), show.legend = T) +
+  #   scale_fill_gradient(
+  #     name = "new impv\nUGA-associated\nportion", labels = scales::label_percent(),
+  #     low = alpha("orange",0.05), high = alpha("orange",1), na.value = "grey",
+  #     limits = c(0, 1)) +
+  #   labs(x = NULL, y = NULL) + theme(axis.text = element_blank())
+  # ,
+  # ggplot(d) + 
+  #   geom_sf(aes(fill = uga_semi_pct_inc), show.legend = T) +
+  #   scale_fill_gradient(
+  #     name = "new semi\nUGA-associated\nportion", labels = scales::label_percent(),
+  #     low = alpha("orange",0.05), high = alpha("orange",1), na.value = "grey",
+  #     limits = c(0, 1)) +
+  #   labs(x = NULL, y = NULL) + theme(axis.text = element_blank())
+  # ,
+  ggplot(d) + 
+    geom_sf(aes(fill = uga_both_pct_inc), show.legend = T) +
+    scale_fill_gradient(
+      name = "new impv+semi\nportion\nUGA-associated", labels = scales::label_percent(),
+      low = alpha("orange",0.05), high = alpha("orange",1), na.value = "grey",
+      limits = c(0, 1)) +
+    labs(x = NULL, y = NULL) + theme(axis.text = element_blank())
+  
+) |> 
+  # wrap_plots(design = "AE\nBF\nCG") +
+  wrap_plots(design = "A\nB") +
+  plot_annotation(tag_levels = "a")
+
+ggsave("../wa_riparian_impervious/rev_f4_UGA.png", bg = "white", width = 8, height = 11, dpi = 300)
+
+```
+
+```{r rev_tbl_SuppImpv}
+#using above fig4 'd'
+
+as_tibble(d) |> 
+  select(
+    cnty, cnty_ha, rmz_ha, eow_ha, fld_ha,
+    starts_with("rch_"),
+    starts_with("semi_"), uga_semi_pct_inc,
+    starts_with("impv_inc"), uga_impv_pct_inc,
+    starts_with("impv_semi_inc"), uga_both_pct_inc
+  ) |> 
+  arrange(desc(uga_both_pct_inc)) |> 
+  gt(caption = md("RDE-HRCD assessed extents and cover change estimates by county geographic boundaries<br>area values in hectares")) |> 
+  cols_label_with(fn = ~str_remove_all(., "rch_ha_|semi_inc_ha_|impv_inc_ha_|impv_semi_inc_ha_")) |> 
+  cols_label(cnty = " ", cnty_ha = "County", rmz_ha = "RMZ", eow_ha = "EOW", fld_ha = "Fld.", rch_ha = "Reach",
+             semi_inc_ha = "Tot.", impv_inc_ha = "Tot.", impv_semi_inc_ha = "Tot.",
+             uga_semi_pct_inc = "%UGA", uga_impv_pct_inc = "%UGA", uga_both_pct_inc = "%UGA"
+             ) |> 
+  tab_spanner("Assessed extent", columns = 2:8) |>
+  tab_spanner("Semi-pervious", columns = c(9:12)) |> 
+  tab_spanner("Impervious", columns = c(13:16)) |> 
+  tab_spanner("Combined", columns = c(17:20)) |> 
+  tab_spanner("2011-2017 riparian cover increase", columns = 9:20) |> 
+  tab_style(style = cell_fill(alpha = 0.15), locations = cells_body(columns = 9:12)) |> 
+  tab_style(style = cell_fill(alpha = 0.30), locations = cells_body(columns = 13:16)) |> 
+  tab_style(style = cell_fill(alpha = 0.45), locations = cells_body(columns = 17:20)) |> 
+  tab_style(
+    style = cell_borders(sides = "left"), 
+    locations = cells_body(columns = c(6,9,13,17))) |> 
+  fmt_number(columns = 2:8, decimals = 0) |> 
+  fmt_number(columns = c(9,13,17), decimals = 1) |> 
+  #fmt_number(columns = c(10:11,14:15,18:19), decimals = 2) |> 
+  fmt_number(columns = c(10:11,14:15,18:19), decimals = 1) |> 
+  fmt_percent(columns = contains("_pct"), decimals = 1) |> 
+  sub_missing() |> gt::gtsave(filename = "../wa_riparian_impervious/rev_tbl_SI_cnty_extnt_impv.png", vwidth = 1400, vheight = 800, expand = 25)
+
+```
+
+showing that PS areas with increases that were the largest relative to the assessed area (fig 3) are also those where increases were concentrated in salmon reaches
+```{r rev_fig_5swifd}
+pal_swifd_chin <- c("not_salmon" = "tan", "salmon_not_chin" = alpha("salmon", 0.5), "salmon_with_chin" = "salmon")
+
+d <- sf_cnty |> 
+  mutate(cnty_ha = st_area(geometry) |> units::set_units("hectares") |> as.numeric()) |> 
+  left_join(
+    rde_cnty_sum |> 
+      summarise(across(ends_with("_ha"), sum), .by = cnty), by = "cnty"
+  ) |> 
+  left_join(
+    rde_cnty_sum |>
+      summarise(across(c(rch_ha, contains("_inc_ha")), sum), .by = c(cnty, swifd_chin)) |> 
+      pivot_wider(names_from = swifd_chin, values_from = c(rch_ha, contains("_inc_ha"))) |> 
+      mutate(across(-cnty, ~replace_na(., 0)))
+    , by = "cnty"
+  ) |> 
+  mutate(
+    notsalmon_both_pct_inc = impv_semi_inc_ha_not_salmon / impv_semi_inc_ha,
+    notchin_both_pct_inc = impv_semi_inc_ha_salmon_not_chin / impv_semi_inc_ha,
+    withchin_both_pct_inc = impv_semi_inc_ha_salmon_with_chin / impv_semi_inc_ha,
+    across(contains("pct"), ~replace_na(., 0))
+  )
+
+#as_tibble(d) |> select(-geometry, -starts_with("rch_ha"), -starts_with("semi_"), -starts_with("impv_inc")) |> arrange(desc(withchin_both_pct_inc)) |> print(n=Inf) #summary()
+
+list(
+  # ggplot(d) + geom_sf(aes(fill = notsalmon_both_pct_inc), show.legend = T) + 
+  # scale_fill_gradient(name = "new impv+semi\nportion\nnot salmon", limits = c(0,1), low = "grey99", high = pal_swifd_chin[1], na.value = "pink", labels = scales::label_percent()) +
+  # labs(x = NULL, y = NULL) + theme(axis.text = element_blank())
+  # ,
+  # # ggplot(d) + geom_sf(aes(fill = notchin_both_pct_inc), show.legend = T) + 
+  # # scale_fill_gradient(name = "new impv+semi\nportion\nnot Chinook", low = "grey99", high = pal_swifd_chin[2], na.value = "pink", labels = scales::label_percent()) +
+  # # labs(x = NULL, y = NULL) + theme(axis.text = element_blank())
+  # # ,
+  # ggplot(d) + geom_sf(aes(fill = notchin_both_pct_inc + withchin_both_pct_inc), show.legend = T) + 
+  # scale_fill_gradient(name = "new impv+semi\nportion\nwith salmon", limits = c(0,1), low = "grey99", high = pal_swifd_chin[3], na.value = "pink", labels = scales::label_percent()) +
+  # labs(x = NULL, y = NULL) + theme(axis.text = element_blank())
+
+  ggplot(d) + geom_sf(aes(fill = impv_semi_inc_ha_not_salmon), show.legend = T) + 
+  scale_fill_gradient(name = "new impv+semi\nportion\nnot salmon", low = "grey99", high = pal_swifd_chin[1], na.value = "pink", labels = scales::label_comma()) +
+  labs(x = NULL, y = NULL) + theme(axis.text = element_blank())
+  ,
+  ggplot(d) + geom_sf(aes(fill = impv_semi_inc_ha_salmon_not_chin + impv_semi_inc_ha_salmon_with_chin), show.legend = T) + 
+  scale_fill_gradient(name = "new impv+semi\nportion\nwith salmon", low = "grey99", high = pal_swifd_chin[3], na.value = "pink", labels = scales::label_comma()) +
+  labs(x = NULL, y = NULL) + theme(axis.text = element_blank())
+  ,
+  rde_swifd_sum |> 
+    filter(swifd_chin != "total") |> 
+    mutate(
+      impv_semi_inc_ha = impv_inc_ha + semi_inc_ha,
+      pct = impv_semi_inc_ha / reach_ha,
+      swifd_any = if_else(str_detect(swifd_chin, "chin"), "salmon", "not salmon")
+      ) |> 
+    select(swifd_any, swifd_chin, reach_ha, impv_semi_inc_ha, pct) |> 
+    # mutate( #hot fix
+    #   pct_txt = if_else(swifd_chin=="salmon_not_chin", sum(pct[-1]), pct)
+    # ) |> 
+    ##even hotter fix
+    summarise(across(c(impv_semi_inc_ha, pct), ~sum(.,na.rm = T)), .by = swifd_any) |> 
+    ggplot() +
+    #geom_col(aes(swifd_any, pct, fill = swifd_chin), show.legend = F) +
+    geom_col(aes(swifd_any, pct, fill = swifd_any), show.legend = F) +
+    #geom_text(aes(swifd_any, pct_txt, label = paste0(round(impv_semi_inc_ha), " ha")),
+    geom_text(aes(swifd_any, pct, label = paste0(round(impv_semi_inc_ha), " ha")),
+              nudge_y = -0.0001) +
+    #scale_fill_manual(values = pal_swifd_chin) +
+    scale_fill_manual(values = c("tan","salmon")) +
+    scale_y_continuous("(increased impv.+semi) / assessed", labels = scales::label_percent()) +
+    scale_x_discrete(name = NULL) #"SWIFD status" guide = guide_axis(n.dodge = 2)
+) |> 
+  wrap_plots(design = "AC\nBC") +
+  plot_annotation(tag_levels = "a")
+
+ggsave("../wa_riparian_impervious/rev_f5_SWIFD.png", bg = "white", width = 11, height = 8, dpi = 300)
+
+```
+
+emphasize that these do not include 'semi'
+```{r rev_fig_6size}
+
+list(
+  rde_impv |>
+    #filter(impv_inc_ha > 1) |> nrow() #145
+    filter(impv_inc_ha <= 1) |> 
+    ggplot() + 
+    geom_histogram(aes(impv_inc_ha), binwidth = 0.01) + #scale_y_log10()
+    geom_vline(xintercept = 0.09, linetype = 2, color ="blue") +
+    annotate("text", x = 0.75, y = 200, label = "Not showing 145 per-reach increases >1 ha") +
+    annotate("text", x = 0.27, y = 1200, label = "<--- Size of a single 30x30m pixel", color = "blue") +
+    labs(y = "Count of per-reach increases", x = "ha")
+  ,
+  rde_impv |>
+    ggplot() +
+    geom_hline(aes(yintercept = max(cimp)/2), linetype = 3) +
+    geom_text(data = tibble(rank = 500, cimp = 460, txt = "half of the total increase associated with the 163 largest per-reach increases"),
+              aes(rank, cimp, label = txt), hjust = 0, vjust = 1) + #filter(rde_impv, between(cimp,473,474))
+    geom_point(aes(rank, cimp, color = cimp < max(cimp)/2), size = 0.3, show.legend = F) +
+    scale_color_manual(values = c("cyan","orange")) +
+    labs(x = "Rank, per-reach increase", y = "Cumulative increase (ha)")
+  ,
+  rde_impv |>
+    filter(impv_inc_ha > 0.1) |> 
+    ggplot(aes(fld_pct, impv_inc_ha)) +
+    geom_point(shape = 18, alpha = 0.6, color = "#7E4837") + #aes(color = rank), 
+    labs(x = "Per-reach proportions of total RDE assessed extent from non-SPTH200yr floodplain", y = "Per-reach impv. increase (ha)")
+) |> 
+  wrap_plots(design = "A\nB\nC") + 
+  plot_annotation( tag_levels = "a")
+
+ggsave("../wa_riparian_impervious/rev_f6_sizedistrib.png", bg = "white", width = 9, height = 12, dpi = 300)
+
+```
+
+recaption as 'estimates of change from alternative assessment approaches'; cannot meet reviewer demands for greater quant analysis but can reduce/avoid 'comparison' language or anything suggesting 'validation'
+```{r rev_tbl_overview}
+
+tibble(
+  Characteristic = c(
+    "Hydrography <br>(total stream km)",
+    "Riparian extent",
+    "Assessed area (ha)",
+    "Land cover\nresolution",
+    "Change years",
+    "Estimated<br>cover change"),
+
+  `RDE-HRCD` = c(
+    paste0("NHD 2022 <br>(", round(rde_swifd_sum$stream_km[4]) |> scales::number(big.mark = ","), ")"),
+    "SPTH~200yr~<br>+floodplains,<br>varied ~30-75m",
+    paste0(
+      "Total: ", round(rde_swifd_sum$reach_ha[4]) |> scales::number(big.mark = ","), "<br><br>",
+      "*RMZ: ", round(ha*rde_swifd_sum$rmz_ac[4]) |> scales::number(big.mark = ","), "*<br>",
+      "*EOW: ", round(ha*rde_swifd_sum$eow_ac[4]) |> scales::number(big.mark = ","), "*<br>",
+      "*Floodplain: ", round(ha*rde_swifd_sum$flood_ac[4]) |> scales::number(big.mark = ","), "*"
+      )
+    ,
+    "1m",
+    "2011-2017",
+    paste0(
+      paste0("Impervious: ", round(rde_swifd_sum$impv_inc_ha[4]), 
+             " ha"), # (", round(rde_swifd_sum$impv_ha_y[4]), " ha/y)"),
+      "<br><br>",
+      paste0("Semi-pervious: ", round(rde_swifd_sum$semi_inc_ha[4]),
+             " ha"), # (", round(rde_swifd_sum$semi_ha_y[4]), " ha/y)"),
+      "<br><br>",
+      paste0("Combined: ", 
+            round(rde_swifd_sum$impv_inc_ha[4] + rde_swifd_sum$semi_inc_ha[4]),
+            " ha"), #(", round(rde_swifd_sum$impv_ha_y[4] + rde_swifd_sum$semi_ha_y[4]), " ha/y)"),
+      "<br><br>"
+      )
+    )
+  ,
+  `StreamCat-NLCD` = c(
+    paste0("NHDPlus v2.1 <br>(", round(sum(sf_flw$lengthkm)) |> scales::number(big.mark = ","), ")"), #same COMIDs as sc_nlcd
+    "'rp100' <br>fixed 100m",
+    scales::number(sc_nlcd_year_sum$rp100_ha[1], big.mark = ","),
+    "30m",
+    "2011-2016",
+    paste(
+    sc_nlcd_year_sum |>
+      filter(aoi == "rp100", nlcd_year %in% c(2011, 2016)) |>
+      select(-aoi, -rp100_ha) |>
+      pivot_longer(-c(nlcd_year), names_to = "nlcd_class", values_to = "ha") |>
+      pivot_wider(names_from = nlcd_year, values_from = ha) |>
+      mutate(
+        nlcd_class = factor(nlcd_class,
+                            levels = c("urbhi","urbmd","urblo","urbop"),
+                            labels = c("High", "Medium", "Low", "Open")),
+        ha = (`2016`-`2011`),
+        ha_yr = ha/5,
+        #d = paste0(nlcd_class, ": ", round(ha)," ha, ", round(ha_yr)," ha/y")
+        d = paste0(nlcd_class, ": ", round(ha)," ha")
+      ) |>
+      arrange(nlcd_class) |>
+      pull(d) |> paste0(collapse = "<br>")
+      )
+    )
+  # ,
+  # `Lazarus 2023` = c(
+  #   "Composite of NHD,<br>WADNR, VSW, FEMA & CHAMP;<br>excluding tribal lands",
+  #   "SPTH~200yr~<br>+floodplains,<br>varied ~30-75m",
+  #   "3,230,047",
+  #   "30m",
+  #   "2001 vs 2019",
+  #   "High: 947 ha<br><br>Medium: 3821 ha<br><br>Low: 881 ha<br><br>Open: -886 ha"
+  # )
+) |>
+  gt() |>
+  cols_label("Characteristic" = "") |> 
+  tab_style(style = cell_text(weight = "bold"), locations = cells_column_labels()) |>
+  tab_style(style = cell_text(v_align = "top"), locations = cells_body()) |> 
+  tab_style(style = cell_fill(alpha = 0.2), locations = cells_body(rows = 6)) |> 
+  tab_style(
+    style = cell_borders(sides = "left"), 
+    locations = cells_body(columns = 2:3)
+    ) |> 
+  tab_style(
+    style = cell_borders(sides = "top", weight = "1.5px"), 
+    locations = cells_body(rows = 6)
+    ) |> 
+  fmt_markdown() |> gt::gtsave(filename = "../wa_riparian_impervious/rev_tbl_overview.png", expand = 25)
+
+```
+
+re-caption as "2021 CCAP 1m impervious cover within WA RDE RMZ+EOW extents<br>aggregated by combined UGAs within county bounds for western WA"
+```{r rev_tbl_ccap}
+
+#stratify by UGA within county bounds
+rde_ccap_df_uga_sum <- rde_ccap_df |> 
+  mutate(uga = if_else(is.na(city_uga_names), "Non-UGA", "UGA")) |> 
+  summarise(
+    across(contains("_ha"), list(sum = ~sum(.))),
+    .by = c(uga, cnty)
+  ) |> 
+  mutate(imp_pct = imp_ha_sum / tot_ha_sum) 
+
+rde_ccap_df_uga_sum <- bind_rows(
+  rde_ccap_df_uga_sum
+  ,
+  rde_ccap_df_uga_sum |> 
+    summarise(across(contains("_ha"), ~sum(., na.rm = T)), .by = uga) |> 
+    mutate(cnty = "Total", imp_pct = imp_ha_sum / tot_ha_sum)
+)
+
+rde_ccap_df_uga_sum |>
+  select(cnty, uga, tot_ha_sum, imp_ha_sum, imp_pct) |> 
+  pivot_wider(names_from = uga, values_from = -c(cnty, uga)) |> 
+  mutate(
+    tot_pct_UGA = tot_ha_sum_UGA / (tot_ha_sum_UGA + `tot_ha_sum_Non-UGA`),
+    Ratio = imp_pct_UGA / `imp_pct_Non-UGA`,
+    imp_ha_sum_pct_UGA = imp_ha_sum_UGA / (imp_ha_sum_UGA + `imp_ha_sum_Non-UGA`)
+  ) |> 
+  arrange(desc(imp_ha_sum_UGA)) |> 
+  gt(
+    #caption = md("2021 CCAP 1m impervious cover within WA RDE RMZ+EOW extents<br>aggregated by combined UGAs within county bounds for western WA")
+    ) |> 
+  cols_label_with(fn = ~str_remove_all(., "tot_ha_sum_|imp_ha_sum_|tot_|imp_pct_")) |> 
+  cols_label(cnty = " ", tot_pct_UGA = "%UGA", imp_ha_sum_pct_UGA = "%UGA") |> 
+  tab_spanner("Assessed extent", columns = starts_with("tot")) |> 
+  tab_spanner("Area (ha)", columns = c(starts_with("imp_ha"))) |> 
+  tab_spanner("% of extent", columns = c(starts_with("imp_pct"))) |> 
+  tab_spanner("Impervious cover", columns = c(starts_with("imp_"), "Ratio")) |> 
+  tab_style(style = cell_text(weight = "bold"), locations = cells_body(rows = cnty == "Total")) |> 
+  tab_style(style = cell_fill(alpha = 0.3), locations = cells_body(columns = c(starts_with("imp_"), "Ratio"))) |> 
+  tab_style(style = cell_borders(sides = "left"), 
+            locations = cells_body(columns = c("tot_ha_sum_Non-UGA", "imp_ha_sum_Non-UGA", "imp_pct_Non-UGA"))) |> 
+  fmt_number(columns = contains("sum"), decimals = 0) |> 
+  fmt_number(columns = "Ratio", decimals = 1) |> 
+  fmt_percent(columns = contains("pct"), decimals = 1) |> 
+  sub_missing()  |> gt::gtsave(filename = "../wa_riparian_impervious/rev_tbl_ccap1m_western_wa.png", expand = 25)
+
+```
+
+```{r rev_tbl_uncert}
+
+tribble(
+  ~Type, ~Concern, ~Dataset, ~Effect, ~Solution,
+  
+  "Hydrography", "Missing small watercourses", "both, primarily StreamCat-NLCD", "estimates biased low", "LiDAR derived watercourses",
+  "Hydrography", "Inconsistent drainage density representation within overall domain", "both, primarily RDE-HRCD", "estimates likely biased low for some sub-areas hindering comparison among internal units", "LiDAR derived watercourses",
+  "Hydrography", "Error in watercourse location", "both", "inaccurate channel edge propagates spatial misalignment of RMZs and land cover polygons/cells; unlikely to drive major estimate bias", "LiDAR derived watercourses",
+
+  "Riparian dimension", "Fixed width", "StreamCat-NLCD", "estimates biased low/high at larger/smaller channels", "variable buffer width as a function of geomorphic setting (drainage area, reach slope, channel and valley constraints) and ecological controls (soils, stand composition)",
+  "Riparian dimension", "Missing data in SPTH~200yr~ RMZ creation", "RDE-HRCD", "estimates biased low where default 100ft buffer width less than applicable reach value", "spatial interpolation of soils/site index values",
+  "Riparian dimension", "Inclusion of floodplain polygons", "RDE-HRCD", "estimates biased high where assesed extent deemed 'non-riparian'", "interactive RDE application permits exclusion by zone",
+  "Riparian dimension", "Error in SPTH~200yr~ values", "RDE-HRCD", "estimates biased low/high due to unduly narrow/wide RMZ resulting from mis-specified site index, tree species, and/or projected growth", "revise assignment of values to simpler ecoregional tiers combining vegetation height with geomorphic setting",
+
+    "Land cover", "Inaccuracy of NLCD category assignment in one or both years of change pair", "StreamCat-NLCD", "estimates biased low/high where actual change greater/less than per-cell classification", "use higher resolution data to better characterize smaller spatial scales",
+  "Land cover", "Imprecision of HRCD change category assignment", "RDE-HRCD", "estimates biased low/high where actual change greater/less than quartile (25/50/75/100%) category", "develop alternative change datasets",
+  "Land cover", "Intersection misalignment", "RDE-HRCD", "estimates biased high where change locations within partially-changed HRCD polygons (quartile < 1) fall outside of RMZ intersection", "develop alternative change datasets",
+) |>
+  gt::gt(
+    caption = "Sources of uncertainty and likely effect on estimate bias",
+    groupname_col = "type", row_group_as_column = T
+    ) |>
+  gt::tab_style(style = cell_text(weight = "bold"), locations = cells_column_labels()) |>
+  gt::tab_style(style = cell_text(weight = "bold"), locations = cells_column_labels()) |>
+  gt::fmt_markdown() |> gt::gtsave(filename = "../wa_riparian_impervious/rev_tbl_uncertainty.png", expand = 25)
+
+```
+
 
 3.1 Assessed extents
 
